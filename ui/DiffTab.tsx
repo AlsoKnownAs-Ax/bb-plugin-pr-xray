@@ -20,6 +20,7 @@ import { threadsToFix } from "../shared/fix-scope";
 import type { DraftComment, FixScope, Hunk, PendingComment, PrFile, ReviewGroup, ReviewThread, StoredComment } from "../shared/schema";
 import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
+import { FixCommentsButton } from "./FixCommentsButton";
 import { prRefKey } from "../shared/pr-ref";
 import { canKeepDraft, draftInDiff, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
@@ -387,14 +388,7 @@ export function DiffTab({
             <Icon name="Sent" />
             {data.pending.length > 0 ? `Submit review (${data.pending.length})` : "Submit review"}
           </Button>
-          <Button className="w-full" size="sm" variant="outline" disabled={myOpenThreads === 0} onClick={() => void fixComments("mine")}>
-            <Icon name="Bot" />
-            Fix my open comments{myOpenThreads ? ` (${myOpenThreads})` : ""}
-          </Button>
-          <Button className="w-full" size="sm" variant="outline" disabled={allOpenThreads === 0} onClick={() => void fixComments("all")}>
-            <Icon name="Bot" />
-            Fix all open comments{allOpenThreads ? ` (${allOpenThreads})` : ""}
-          </Button>
+          <FixCommentsButton counts={{ mine: myOpenThreads, all: allOpenThreads }} onFix={(scope) => void fixComments(scope)} />
           <p className="text-[11px] text-muted-foreground">j/k hunks · n/p groups · c comment</p>
         </div>
       </aside>
