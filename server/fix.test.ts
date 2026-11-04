@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { describe, expect, it, vi } from "vitest";
 import type { PrDetails, ReviewThread, StoredComment } from "../shared/schema";
-import { threadsToFix } from "../shared/fix-scope";
+import { savedFixScope, threadsToFix } from "../shared/fix-scope";
 import { fixDiagramComments, fixDiffComments } from "./fix";
 import { prWorktreeEnvironment } from "./worker-environment";
 
@@ -73,6 +73,18 @@ describe("fix threads", () => {
     const forkPr = { ...pr, headInBaseRepo: false } as PrDetails;
     await expect(fixDiffComments(fakeBb(spawn), forkPr, threads, new Map(), "mine")).rejects.toThrow("forks");
     expect(spawn).not.toHaveBeenCalled();
+  });
+});
+
+describe("the saved fix button choice", () => {
+  it("restores what the user picked", () => {
+    expect(savedFixScope("all")).toBe("all");
+    expect(savedFixScope("mine")).toBe("mine");
+  });
+
+  it("falls back to the safe choice when nothing valid is saved", () => {
+    expect(savedFixScope(null)).toBe("mine");
+    expect(savedFixScope("everything")).toBe("mine");
   });
 });
 

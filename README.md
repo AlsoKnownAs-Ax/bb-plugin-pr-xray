@@ -4,7 +4,7 @@ Self-review GitHub pull requests before asking for review:
 
 - **Diff tab**: hunks grouped by concern and ordered as a reading path (noise last), with viewed checkmarks, split/unified view and GitHub-style inline comments: single comments, start/submit a review, suggestions, replies, editing your posted comments and resolve.
 - **Explain tab**: a summary informed by the linked Notion ticket and its parent project, a walkthrough, "where to look closely", and interactive diagrams. Click a node to leave a design comment (kept in bb only).
-- **Fix with agents**: fix one thread, fix your open review comments, fix all open comments, or redesign from all diagram comments (plan first, then waits for your approval). Each start shows a toast with a link to the thread.
+- **Fix with agents**: fix one thread, fix your open review comments or all open comments (one button, with a dropdown that remembers your choice), or redesign from all diagram comments (plan first, then waits for your approval). Each start shows a toast with a link to the thread.
 - **Retro feed**: tag comments yourself or click “AI tag”; `bb pr-xray comments --json` exports them.
 
 ## Install

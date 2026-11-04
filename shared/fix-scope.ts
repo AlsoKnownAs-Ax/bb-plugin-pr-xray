@@ -2,6 +2,10 @@
 // text, because on a public repo anyone can post a comment and prompt-inject the agent.
 import type { FixScope, ReviewThread } from "./schema";
 
+export function savedFixScope(saved: string | null): FixScope {
+  return saved === "all" ? "all" : "mine";
+}
+
 export function isViewer(author: string, viewer: string): boolean {
   return author.toLowerCase() === viewer.toLowerCase();
 }
