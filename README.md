@@ -10,7 +10,7 @@ Self-review GitHub pull requests before asking for review:
 ## Install
 
 ```sh
-bb plugin install git:github.com/AlsoKnownAs-Ax/bb-plugins --subdirectory pr-xray
+bb plugin install git:github.com/AlsoKnownAs-Ax/bb-plugin-pr-xray
 ```
 
 Open it with the command palette (**PR X-ray: Review a pull request**; bind a shortcut in Settings → Keyboard), from the **PR X-ray** page in the nav rail, by asking any agent to "x-ray <PR url>", or with `bb pr-xray review <url>`.
