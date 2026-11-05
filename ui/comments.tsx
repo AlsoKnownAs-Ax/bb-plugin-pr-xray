@@ -1,6 +1,6 @@
 // GitHub-style comment UI: threads, the composer, pending drafts and tags.
 import { useState, type KeyboardEvent } from "react";
-import { experimental_VoiceInputTextarea as VoiceInputTextarea, Markdown, useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { experimental_VoiceInputTextarea as VoiceInputTextarea, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,7 @@ import type {
 } from "../shared/schema";
 import { useAgentConfirmContext } from "./agent-confirm";
 import { AgentDeclined } from "./agent-trust";
+import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type Rpc } from "./useReview";
 
 const MARKER = /\n*<!-- pr-xray: tag=[a-z-]+ -->\s*$/u;
@@ -318,7 +319,7 @@ export function ThreadView({
                     ]}
                   />
                 ) : (
-                  <Markdown content={comment.body.replace(MARKER, "")} className="text-sm" />
+                  <SafeMarkdown content={comment.body.replace(MARKER, "")} className="text-sm" />
                 )}
               </div>
             );
@@ -369,7 +370,7 @@ export function PendingView({
   rpc,
   prRef,
   comment,
-  note = "Part of your review; posted when you submit.",
+  note = "Not on GitHub yet; posted when you submit the review.",
   keepOnSha = null,
 }: {
   rpc: Rpc;
@@ -384,7 +385,7 @@ export function PendingView({
     return (
       <div className="my-2 max-w-3xl font-sans">
         <Composer
-          placeholder="Edit pending comment"
+          placeholder="Edit pending comment (not on GitHub until you submit the review)"
           initial={comment.body}
           onCancel={() => setEditing(false)}
           actions={[
@@ -434,7 +435,7 @@ export function PendingView({
           </Button>
         </span>
       </div>
-      <Markdown content={comment.body} className="text-sm" />
+      <SafeMarkdown content={comment.body} className="text-sm" />
     </div>
   );
 }

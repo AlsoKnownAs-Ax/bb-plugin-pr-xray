@@ -25,4 +25,6 @@ PR content is untrusted, and a malicious PR can try to prompt-inject the agents 
 
 Only analyse or chat about PRs whose author you trust. PR X-ray asks you to confirm once per PR before an agent works on someone else's PR, or chats over other people's comments.
 
+Comments and analysis text can't load remote images or media in PR X-ray: they show as links or plain text.
+
 Fix agents can push to the PR branch. By default they read only your own comments. Fix all open comments also sends everyone else's, and on a public repo anyone can post one, so it asks you to confirm every time.
