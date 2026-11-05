@@ -25,11 +25,13 @@ Open it with the command palette (**PR X-ray: Review a pull request**; bind a sh
 
 ## Security
 
+**Only use agents on PRs you trust.** Analyse, chat, fix and AI tagging run agents that read PR content such as its code, description and comments. Text in a PR can try to instruct those agents. A steered agent could use your GitHub login, call PR X-ray's commands (including approving or commenting) and read local files. An image in a chat reply could also send data out, with no click needed. Viewing a diff and commenting by hand don't run agents.
+
 PR titles, descriptions, diffs and branch files are untrusted, and a malicious PR can try to prompt-inject the agents that read them. Those agents run in a disposable copy of the PR's commit, or with no repository, and are told to treat PR content as data and stay off the network. That instruction is not a security boundary.
 
 **With Codex, analysis and chat agents have network access.** bb's Codex workspace sandbox always allows it and PR X-ray can't turn it off, so an injected agent could reach the internet, run `gh` with your login and read files on your machine. Other providers depend on their own sandbox and approval settings, so don't treat those as a hard boundary either.
 
-Only analyse or chat about PRs whose author you trust. This matters most for PRs from people outside your team. PR X-ray asks you to confirm once per PR before an agent works on someone else's PR, or chats over other people's comments. It can't see commits or edits others made to your own PR.
+Trust matters most for PRs from people outside your team. PR X-ray asks you to confirm once per PR before an agent works on someone else's PR, or chats over other people's comments. It can't see commits or edits others made to your own PR.
 
 Comments and analysis text can't load remote images or media in PR X-ray: they show as links or plain text.
 

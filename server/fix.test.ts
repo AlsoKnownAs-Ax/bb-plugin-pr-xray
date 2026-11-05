@@ -1,9 +1,10 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PrDetails, ReviewThread, StoredComment } from "../shared/schema";
 import { savedFixScope, threadsToFix } from "../shared/fix-scope";
 import { fixDiagramComments, fixDiffComments } from "./fix";
 import { prCloneEnvironment } from "./worker-environment";
+import { removeWorkerDir } from "./worker-files";
 
 const pr = {
   ref: { owner: "acme", repo: "web", number: 7 },
@@ -35,10 +36,21 @@ function fakeBb(
   } as unknown as BbPluginApi;
 }
 
-vi.mock("./worker-clone", () => ({ clonePrCommit: vi.fn(async ({ dir }: { dir: string }) => `${dir}/repo`) }));
+const workerDirs = vi.hoisted(() => [] as string[]);
+vi.mock("./worker-clone", () => ({
+  clonePrCommit: vi.fn(async ({ dir }: { dir: string }) => {
+    workerDirs.push(dir);
+    return `${dir}/repo`;
+  }),
+}));
+
+// A started fix keeps its real temp folder until its thread is archived, which these tests never do.
+afterEach(async () => {
+  await Promise.all(workerDirs.splice(0).map((dir) => removeWorkerDir(dir)));
+});
 
 describe("fix threads", () => {
-  it("run in a worktree of the PR branch", async () => {
+  it("run in a copy of the PR's commit", async () => {
     const spawn = vi.fn(async () => ({ id: "thr_1" }));
     await expect(fixDiffComments(fakeBb(spawn), pr, threads, new Map(), "mine")).resolves.toEqual({ threadId: "thr_1" });
     expect(spawn).toHaveBeenCalledWith(
