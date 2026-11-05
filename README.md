@@ -1,6 +1,6 @@
 # PR X-ray for bb
 
-Self-review GitHub pull requests before asking for review:
+Understand a GitHub pull request before you review it:
 
 - **Diff tab**: hunks grouped by concern and ordered as a reading path (noise last), with viewed checkmarks, split/unified view and GitHub-style inline comments: single comments, start/submit a review, suggestions, replies, editing your posted comments and resolve.
 - **Explain tab**: a summary informed by the linked Notion ticket and its parent project, a walkthrough, "where to look closely", and interactive diagrams. Click a node to leave a design comment (kept in bb only).
