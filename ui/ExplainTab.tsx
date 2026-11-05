@@ -1,7 +1,7 @@
 // The visual explanation: narrative, diagrams with pinned design comments,
 // and what to look at closely.
 import { useMemo, useState } from "react";
-import { Markdown, useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -10,6 +10,7 @@ import type { AnalysisRecord, DiagramNode, ReviewGroup, StoredComment } from "..
 import { Composer, TagChip } from "./comments";
 import { DiagramCanvas } from "./DiagramCanvas";
 import { useAgentConfirmContext } from "./agent-confirm";
+import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
 
 const SEVERITY_STYLE = {
@@ -96,7 +97,7 @@ export function ExplainTab({
         <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
           <section className="space-y-2">
             <h2 className="text-base font-semibold">What this PR does</h2>
-            <Markdown content={result.summary} />
+            <SafeMarkdown content={result.summary} />
             {result.ticket.url ? (
               <p className="text-xs text-muted-foreground">
                 Ticket:{" "}
@@ -149,7 +150,7 @@ export function ExplainTab({
                   <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-border text-xs">{index + 1}</span>
                   <div className="min-w-0">
                     <div className="font-medium">{step.title}</div>
-                    <Markdown content={step.body} className="text-sm" />
+                    <SafeMarkdown content={step.body} className="text-sm" />
                     <GroupLinks ids={step.groupIds} />
                   </div>
                 </li>
@@ -262,7 +263,7 @@ function DiagramCommentCard({ comment, rpc, onSelect }: { comment: StoredComment
         </button>
         <TagChip className="ml-auto" tag={comment.tag} onChange={(tag) => void call(rpc.call("comment.setTag", { commentId: comment.id, tag }))} onAutoTag={() => rpc.call("comment.autoTag", { commentId: comment.id })} />
       </div>
-      <Markdown content={comment.body} className="text-sm" />
+      <SafeMarkdown content={comment.body} className="text-sm" />
       <div className="flex gap-1">
         {comment.status !== "resolved" ? (
           <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => void call(rpc.call("diagram.updateComment", { id: comment.id, status: "resolved" }))}>

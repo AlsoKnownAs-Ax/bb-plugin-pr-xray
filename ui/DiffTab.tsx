@@ -857,7 +857,7 @@ function HunkDiff({
                 Comment on {start === end ? `line ${end}` : `lines ${start}–${end}`}
               </div>
               <Composer
-                placeholder="Leave a comment (⌘↩ to add to your review)"
+                placeholder="Leave a comment (⌘/Ctrl+Enter to add to your review)"
                 suggestion={isNewSide ? sideLines([hunk], "RIGHT", start, end) : null}
                 onCancel={() => setDraft(null)}
                 actions={[

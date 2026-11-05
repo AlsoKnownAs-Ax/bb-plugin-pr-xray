@@ -162,8 +162,8 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
     <FocusFrame focus={focus}>
       <AgentConfirmProvider value={agentConfirm}>
       <header className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="min-w-64 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
             <a href={pr.url} target="_blank" rel="noreferrer" className="hover:underline">
               {pr.ref.owner}/{pr.ref.repo}#{pr.ref.number}
             </a>
@@ -173,7 +173,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             </span>
             <span>·</span>
             <span>{pr.draft ? "draft" : pr.state}</span>
-            {analysis?.diffOnly ? <span className="rounded border border-border px-1.5">diff-only analysis</span> : null}
+            {analysis?.diffOnly ? <span className="whitespace-nowrap rounded border border-border px-1.5">diff-only analysis</span> : null}
           </div>
           <h1 className="truncate text-base font-semibold">{pr.title}</h1>
         </div>

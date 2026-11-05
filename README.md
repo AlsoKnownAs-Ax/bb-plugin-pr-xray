@@ -30,6 +30,8 @@ PR titles, descriptions, diffs and branch files are untrusted, and a malicious P
 
 Only analyse or chat about PRs whose author you trust. This matters most for PRs from people outside your team. PR X-ray asks you to confirm once per PR before an agent works on someone else's PR, or chats over other people's comments. It can't see commits or edits others made to your own PR.
 
+Comments and analysis text can't load remote images or media in PR X-ray: they show as links or plain text.
+
 **Fix agents can push to the PR branch.** *Fix with agent* and *Fix my open comments* send only your own comments to the agent. *Fix all open comments* and *Include others' comments* also send everyone else's, and on a public repo anyone can post one, so they ask you to confirm every time. The agent is told when comments were left out, because a reply can make little sense without what it answers.
 
 ## `bb pr-xray comments --json`
