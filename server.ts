@@ -26,7 +26,7 @@ export default async function plugin(bb: BbPluginApi) {
       type: "string",
       label: "GitHub token",
       description:
-        "Fine-grained token with Pull requests: read & write and Contents: read. Leave empty to use your `gh` login.",
+        "Fine-grained token with Pull requests: read & write and Contents: read. Leave empty to use your gh login.",
       secret: true,
     },
     notionProjectProperty: {

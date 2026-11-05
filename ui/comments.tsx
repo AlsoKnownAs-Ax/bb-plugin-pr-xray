@@ -259,7 +259,7 @@ export function ThreadView({
         <Icon name={collapsed ? "ChevronRight" : "ChevronDown"} className="size-3.5" />
         {settled ? null : <Icon name="MessageSquare" className="size-3.5 shrink-0 text-warning-text" />}
         <span className="shrink-0 font-medium text-foreground">{first?.author ?? "comment"}</span>
-        <span className={cn("min-w-0 truncate", settled && "text-muted-foreground")}>{first?.body.replace(MARKER, "").split("\n")[0]}</span>
+        <span className={cn("min-w-0 truncate", settled && "text-muted-foreground")}>{first?.body.replace(MARKER, "").split("\n")[0]?.replaceAll("`", "")}</span>
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
           {thread.isOutdated ? <span className="rounded border border-border px-1.5">outdated</span> : null}
           {thread.isResolved ? <span className="rounded border border-border px-1.5">resolved</span> : null}
