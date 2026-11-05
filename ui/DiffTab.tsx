@@ -286,7 +286,7 @@ export function DiffTab({
   const openFullFile = async (file: PrFile) => {
     setFullFile({ file, content: null, loading: true });
     try {
-      const contents = await rpc.call("file.contents", { ref: pr.ref, path: file.path, previousPath: file.previousPath });
+      const contents = await rpc.call("file.contents", { ref: pr.ref, headSha: pr.headSha, path: file.path, previousPath: file.previousPath });
       setFullFile({ file, content: contents.new ?? contents.old, loading: false });
     } catch (error) {
       toast.error(errorMessage(error));

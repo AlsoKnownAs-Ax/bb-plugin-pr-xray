@@ -14,6 +14,7 @@ import { AgentDeclined } from "./agent-trust";
 import { ChatBubble } from "./ChatBubble";
 import { DiffTab, type ViewMode } from "./DiffTab";
 import { displayGroups } from "./diff-utils";
+import { viewedRows } from "./hold-commit";
 import { ExplainTab } from "./ExplainTab";
 import { uiStore } from "./store";
 import { errorMessage, useReview } from "./useReview";
@@ -55,7 +56,7 @@ function FocusFrame({ focus, children }: { focus: boolean; children: ReactNode }
 }
 
 export function ReviewPage({ prRef }: { prRef: PrRef }) {
-  const { rpc, data, error, refetch } = useReview(prRef);
+  const { rpc, data, error, refetch, refresh, newCommits } = useReview(prRef);
   const navigate = useBbNavigate();
   const [tab, setTab] = useState<Tab>("diff");
   const [focus, setFocus] = useState(() => uiStore.get().focusOnOpen);
@@ -100,16 +101,18 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
     return set;
   }, [data?.viewedHunks, localViewed]);
 
+  const shownPr = data?.pr;
   const setHunksViewed = useCallback(
     (fingerprints: string[], value: boolean) => {
+      if (!shownPr) return;
       setLocalViewed((current) => {
         const next = new Map(current);
         for (const fingerprint of fingerprints) next.set(fingerprint, value);
         return next;
       });
-      rpc.call("hunks.setViewed", { ref: prRef, fingerprints, viewed: value }).catch((cause: unknown) => toast.error(errorMessage(cause)));
+      rpc.call("hunks.setViewed", { ref: prRef, ...viewedRows(shownPr, fingerprints), viewed: value }).catch((cause: unknown) => toast.error(errorMessage(cause)));
     },
-    [prRef, rpc],
+    [prRef, rpc, shownPr],
   );
 
   const { confirmAgent, confirmOthersComments, dialog: agentDialog } = useAgentConfirm(prRef, data?.pr ?? null);
@@ -129,7 +132,8 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
     if (!(await confirmAgent("analysis"))) return;
     try {
       await rpc.call("analysis.start", { ref: prRef });
-      refetch();
+      // The analysis is of the latest commit, so show that.
+      await refresh();
     } catch (cause) {
       toast.error(errorMessage(cause));
     }
@@ -227,6 +231,8 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
         />
       ) : null}
       <Banners
+        newCommits={newCommits ? pr.headSha.slice(0, 7) : null}
+        onRefresh={() => void refresh().catch((cause: unknown) => toast.error(errorMessage(cause)))}
         failed={failed ? (current?.error ?? "Analysis failed.") : null}
         stale={stale && !running}
         onReanalyse={() => void reanalyse()}
@@ -343,6 +349,8 @@ function AnalysisProgress({
 }
 
 function Banners({
+  newCommits,
+  onRefresh,
   failed,
   stale,
   onReanalyse,
@@ -350,6 +358,9 @@ function Banners({
   ticketOverridden,
   onSetTicket,
 }: {
+  /** The short commit still being shown, when the PR has moved past it. */
+  newCommits: string | null;
+  onRefresh: () => void;
   failed: string | null;
   stale: boolean;
   onReanalyse: () => void;
@@ -362,6 +373,16 @@ function Banners({
   const banner = "flex flex-wrap items-center gap-2 border-b border-border px-4 py-1.5 text-xs";
   return (
     <>
+      {newCommits ? (
+        <div role="status" className={cn(banner, "bg-warning/10")}>
+          <Icon name="Commit" className="size-3.5" />
+          New commits were pushed. You're still viewing {newCommits}.
+          <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={onRefresh}>
+            <Icon name="RotateCcw" className="size-3" />
+            Refresh
+          </Button>
+        </div>
+      ) : null}
       {failed ? (
         <div className={cn(banner, "text-destructive")}>
           <Icon name="AlertTriangle" className="size-3.5" />

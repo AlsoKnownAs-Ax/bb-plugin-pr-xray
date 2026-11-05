@@ -37,8 +37,13 @@ const threadOut = z.object({ threadId: z.string() });
 
 export const rpcContract = defineRpcContract({
   "review.get": {
-    input: z.object({ ref: prRefSchema }),
+    /** `fresh` skips the short server cache, to show a commit that was just pushed. */
+    input: z.object({ ref: prRefSchema, fresh: z.boolean().optional() }),
     output: reviewGetOutputSchema,
+  },
+  "review.head": {
+    input: z.object({ ref: prRefSchema }),
+    output: z.object({ headSha: z.string() }),
   },
   "review.recent": {
     input: z.null(),
@@ -53,11 +58,17 @@ export const rpcContract = defineRpcContract({
     output: z.object({ analysis: analysisRecordSchema }),
   },
   "hunks.setViewed": {
-    input: z.object({ ref: prRefSchema, fingerprints: z.array(z.string()).max(5000), viewed: z.boolean() }),
+    input: z.object({
+      ref: prRefSchema,
+      hunks: z.array(z.object({ path: z.string(), fingerprint: z.string() })).max(20000),
+      /** Every hunk in the code the user is looking at, which may be an older commit than the PR's latest. */
+      current: z.array(z.string()).max(20000),
+      viewed: z.boolean(),
+    }),
     output: ok,
   },
   "file.contents": {
-    input: z.object({ ref: prRefSchema, path: z.string(), previousPath: z.string().nullable() }),
+    input: z.object({ ref: prRefSchema, headSha: z.string(), path: z.string(), previousPath: z.string().nullable() }),
     output: z.object({ old: z.string().nullable(), new: z.string().nullable() }),
   },
   /** One file at a commit; null when it is missing or too large for GitHub to inline. */
