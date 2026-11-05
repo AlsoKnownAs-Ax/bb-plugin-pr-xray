@@ -22,7 +22,7 @@ import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
 import { FixCommentsButton } from "./FixCommentsButton";
 import { prRefKey } from "../shared/pr-ref";
-import { canKeepDraft, draftInDiff, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
+import { canKeepDraft, draftInDiff, filesNotShown, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
 
 export type ViewMode = "unified" | "split";
@@ -395,6 +395,7 @@ export function DiffTab({
 
       <div ref={scrollRef} className="min-w-0 flex-1 overflow-y-auto">
         <div className="mx-auto max-w-[1400px] space-y-8 p-4 md:p-6">
+          <FilesNotShown pr={pr} />
           {groups.map((group, index) => {
             const groupOpen = isOpen(group.id, viewed.has(group.id));
             return (
@@ -935,6 +936,8 @@ function SubmitReviewDialog({
   const [dictating, setDictating] = useState(false);
   const own = data.pr.isOwnPr;
   const submittedEvent = own ? "COMMENT" : event;
+  const { files: patchless, unlisted } = filesNotShown(data.pr);
+  const notShown = patchless.length + unlisted;
   // GitHub only accepts an empty review when it is an approval.
   const canSubmit = blockedDrafts === 0 && (submittedEvent === "APPROVE" || data.pending.length > 0 || body.trim() !== "");
   const submit = async () => {
@@ -973,6 +976,12 @@ function SubmitReviewDialog({
           placeholder="Leave a summary (optional)"
           className={cn(TEXTAREA_CLASS, "min-h-24")}
         />
+        {submittedEvent === "APPROVE" && notShown > 0 ? (
+          <p className="flex items-start gap-2 text-sm text-warning-text">
+            <Icon name="AlertTriangle" className="mt-0.5 size-4 shrink-0" />
+            {notShown === 1 ? "1 changed file isn't" : `${notShown} changed files aren't`} shown in this diff. Check {notShown === 1 ? "it" : "them"} on GitHub before you approve.
+          </p>
+        ) : null}
         <div className="space-y-1.5">
           {options.map((option) => {
             const disabled = own && option.value !== "COMMENT";
@@ -1006,5 +1015,35 @@ function SubmitReviewDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Without this, a change GitHub gives no patch for would have no sign anywhere in the review. */
+function FilesNotShown({ pr }: { pr: ReviewGet["pr"] }) {
+  const { files, unlisted } = filesNotShown(pr);
+  if (files.length === 0 && unlisted === 0) return null;
+  return (
+    <section className="space-y-2 rounded-lg border border-warning/50 bg-warning/5 p-3 text-sm">
+      <h2 className="flex items-center gap-2 font-medium">
+        <Icon name="AlertTriangle" className="size-4 shrink-0" />
+        Not shown in this diff
+      </h2>
+      <p className="text-xs text-muted-foreground">
+        GitHub gives no patch for binary, very large, or rename-only changes.{" "}
+        <a href={`${pr.url}/files`} target="_blank" rel="noreferrer" className="underline">
+          Check them on GitHub
+        </a>
+        .
+      </p>
+      <ul className="space-y-0.5 font-mono text-xs">
+        {files.map((file) => (
+          <li key={file.index}>
+            {file.previousPath ? `${file.previousPath} → ` : ""}
+            {file.path} <span className="text-muted-foreground">({file.status})</span>
+          </li>
+        ))}
+        {unlisted > 0 ? <li className="font-sans text-muted-foreground">and {unlisted} more that GitHub's listing left out</li> : null}
+      </ul>
+    </section>
   );
 }

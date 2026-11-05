@@ -163,6 +163,8 @@ export const prDetailsSchema = z.object({
   baseRef: z.string(),
   viewer: z.string(),
   isOwnPr: z.boolean(),
+  /** GitHub's count, which can exceed `files`: its file listing stops at 3000. */
+  changedFiles: z.number(),
   files: z.array(prFileSchema),
   hunks: z.array(hunkSchema),
   threads: z.array(reviewThreadSchema),

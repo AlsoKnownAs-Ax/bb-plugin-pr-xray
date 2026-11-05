@@ -2,7 +2,7 @@
 import { getSingularPatch, processFile } from "@pierre/diffs";
 import type { FileDiffMetadata } from "@pierre/diffs";
 import type { ReviewGet } from "../shared/contract";
-import type { Hunk, PendingComment, PrFile, ReviewGroup, ReviewThread } from "../shared/schema";
+import type { Hunk, PendingComment, PrDetails, PrFile, ReviewGroup, ReviewThread } from "../shared/schema";
 
 export interface HunkRange {
   oldStart: number;
@@ -119,6 +119,11 @@ export function lineInHunks(hunks: Hunk[], side: "LEFT" | "RIGHT", line: number)
       ? line >= range.newStart && line <= range.newEnd
       : line >= range.oldStart && line <= range.oldEnd;
   });
+}
+
+/** Changes the reading path can't show: files without a patch, and files GitHub's listing left out. */
+export function filesNotShown(pr: PrDetails): { files: PrFile[]; unlisted: number } {
+  return { files: pr.files.filter((file) => file.hunkIds.length === 0), unlisted: Math.max(0, pr.changedFiles - pr.files.length) };
 }
 
 /** Groups from the analysis, or one group per file while it is not ready. */
