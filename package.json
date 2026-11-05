@@ -15,7 +15,7 @@
   },
   "bb": {
     "name": "PR X-ray",
-    "description": "Review GitHub PRs grouped by concern, with diagrams, inline GitHub comments and design feedback for retros.",
+    "description": "Understand a pull request before you review it: grouped by concern, in reading order, with a walkthrough and diagrams.",
     "branding": {
       "icon": "GitPullRequest"
     },
