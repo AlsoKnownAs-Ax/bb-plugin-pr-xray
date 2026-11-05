@@ -11,6 +11,7 @@ import { createAnalysis, findTicketUrl } from "./server/analysis";
 import { chatInstructions, createChat } from "./server/chat";
 import { createComments } from "./server/comments";
 import { fixDiagramComments, fixDiffComments } from "./server/fix";
+import { removeFilesWhenArchived } from "./server/worker-files";
 import { createGithub, GithubError } from "./server/github";
 import { createModels } from "./server/models";
 import { createStore } from "./server/store";
@@ -73,6 +74,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   const chat = createChat({ bb, models, loadPr, analysisFor: (ref) => store.latestCompletedAnalysis(ref) });
   bb.onDispose(() => chat.dispose());
+  removeFilesWhenArchived(bb);
 
   function reviewLink(ref: PrRef): string {
     const path = `/plugins/${bb.pluginId}/${REVIEW_PANEL_PATH}/${prRefToSubPath(ref)}`;

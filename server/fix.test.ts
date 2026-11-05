@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrDetails, ReviewThread, StoredComment } from "../shared/schema";
 import { savedFixScope, threadsToFix } from "../shared/fix-scope";
 import { fixDiagramComments, fixDiffComments } from "./fix";
-import { prWorktreeEnvironment } from "./worker-environment";
+import { prCloneEnvironment } from "./worker-environment";
 
 const pr = {
   ref: { owner: "acme", repo: "web", number: 7 },
@@ -35,18 +35,20 @@ function fakeBb(
   } as unknown as BbPluginApi;
 }
 
+vi.mock("./worker-clone", () => ({ clonePrCommit: vi.fn(async ({ dir }: { dir: string }) => `${dir}/repo`) }));
+
 describe("fix threads", () => {
   it("run in a worktree of the PR branch", async () => {
     const spawn = vi.fn(async () => ({ id: "thr_1" }));
     await expect(fixDiffComments(fakeBb(spawn), pr, threads, new Map(), "mine")).resolves.toEqual({ threadId: "thr_1" });
     expect(spawn).toHaveBeenCalledWith(
       expect.objectContaining({
-        environment: prWorktreeEnvironment("host_1", "feature"),
+        environment: prCloneEnvironment("host_1", expect.stringMatching(/repo$/u) as unknown as string),
       }),
     );
   });
 
-  it("report a worktree failure instead of falling back to the checkout", async () => {
+  it("report a failed copy instead of falling back to the checkout", async () => {
     const spawn = vi.fn(async () => {
       throw new Error("no such branch");
     });
@@ -54,10 +56,10 @@ describe("fix threads", () => {
     expect(spawn).toHaveBeenCalledTimes(1);
   });
 
-  it("report a worktree that fails after spawn, and leave no thread behind", async () => {
+  it("report a copy that fails after spawn, and leave no thread behind", async () => {
     const spawn = vi.fn(async () => ({ id: "thr_1" }));
     const bb = fakeBb(spawn, undefined, { status: "error", environmentId: null });
-    await expect(fixDiffComments(bb, pr, threads, new Map(), "mine")).rejects.toThrow("worktree");
+    await expect(fixDiffComments(bb, pr, threads, new Map(), "mine")).rejects.toThrow("copy");
     expect(bb.sdk.threads.archive).toHaveBeenCalledWith({ threadId: "thr_1" });
   });
 
