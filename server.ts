@@ -192,8 +192,8 @@ export default async function plugin(bb: BbPluginApi) {
       comments.publish(ref);
       return { ok: true };
     },
-    async "review.submit"({ ref, event, body }) {
-      const result = await showingNewCommits(ref, () => comments.submitReview(ref, event, body));
+    async "review.submit"({ ref, headSha, event, body }) {
+      const result = await showingNewCommits(ref, () => comments.submitReview(ref, headSha, event, body));
       invalidate(ref);
       return result;
     },

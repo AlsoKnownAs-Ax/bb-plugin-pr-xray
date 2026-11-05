@@ -88,6 +88,7 @@ export const rpcContract = defineRpcContract({
   "review.submit": {
     input: z.object({
       ref: prRefSchema,
+      headSha: z.string().min(1),
       event: z.enum(["COMMENT", "APPROVE", "REQUEST_CHANGES"]),
       body: z.string(),
     }),

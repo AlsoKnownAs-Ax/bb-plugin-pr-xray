@@ -63,8 +63,9 @@ export function createComments(deps: { bb: BbPluginApi; store: Store; github: Gi
     publish(ref);
   }
 
-  async function submitReview(ref: PrRef, event: "COMMENT" | "APPROVE" | "REQUEST_CHANGES", body: string) {
-    const headSha = await github.headSha(ref);
+  /** `headSha` is the commit the reviewer was shown: a review must not land on code they never saw. */
+  async function submitReview(ref: PrRef, headSha: string, event: "COMMENT" | "APPROVE" | "REQUEST_CHANGES", body: string) {
+    if ((await github.headSha(ref)) !== headSha) throw new Error("This PR has new commits. Review them, then submit.");
     const pending = store.pendingComments(ref);
     // A review has one commit, and a draft's line numbers only hold on the commit it was written on.
     if (pending.some((comment) => comment.headSha !== headSha)) {

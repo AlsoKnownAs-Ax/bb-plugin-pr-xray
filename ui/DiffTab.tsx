@@ -940,7 +940,7 @@ function SubmitReviewDialog({
   const submit = async () => {
     setBusy(true);
     try {
-      const { posted } = await rpc.call("review.submit", { ref: data.pr.ref, event: submittedEvent, body });
+      const { posted } = await rpc.call("review.submit", { ref: data.pr.ref, headSha: data.pr.headSha, event: submittedEvent, body });
       toast.success(posted === 0 && submittedEvent === "APPROVE" ? "Pull request approved" : `Review submitted with ${posted} comment${posted === 1 ? "" : "s"}`);
       setBody("");
       onOpenChange(false);
