@@ -1,13 +1,32 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewGet } from "../shared/contract";
-import type { Hunk, PendingComment, ReviewGroup } from "../shared/schema";
-import { canKeepDraft, displayGroups, draftInDiff, firstChangedLine, hunkRange, lineInHunks, sideLines } from "./diff-utils";
+import type { Hunk, PendingComment, PrDetails, ReviewGroup } from "../shared/schema";
+import { canKeepDraft, displayGroups, draftInDiff, filesNotShown, firstChangedLine, hunkRange, lineInHunks, sideLines } from "./diff-utils";
 
 function hunk(header: string, body: string[]): Hunk {
   return { id: "h1", path: "a.ts", header, patch: [header, ...body].join("\n"), fingerprint: "f1" } as unknown as Hunk;
 }
 
 const sample = hunk("@@ -10,3 +10,4 @@", [" keep", "-old", "+new one", "+new two", " tail"]);
+
+describe("changed files the diff can't show", () => {
+  const pr = (changedFiles: number, ...hunkIds: string[][]) =>
+    ({ changedFiles, files: hunkIds.map((ids, index) => ({ index, path: `f${index}`, hunkIds: ids })) }) as unknown as PrDetails;
+
+  it("names a file with no patch, even though the reading path skips it", () => {
+    const shown = pr(2, ["f0h0"], []);
+    expect(filesNotShown(shown).files.map((file) => file.path)).toEqual(["f1"]);
+    expect(filesNotShown(shown).unlisted).toBe(0);
+  });
+
+  it("counts files GitHub's listing left out", () => {
+    expect(filesNotShown(pr(3001, ["f0h0"])).unlisted).toBe(3000);
+  });
+
+  it("has nothing to report when every file is in the diff", () => {
+    expect(filesNotShown(pr(1, ["f0h0"]))).toEqual({ files: [], unlisted: 0 });
+  });
+});
 
 describe("reading path after new commits", () => {
   const group = (id: string, kind: ReviewGroup["kind"], ...hunkIds: string[]): ReviewGroup => ({ id, title: id, why: id, kind, hunkIds });

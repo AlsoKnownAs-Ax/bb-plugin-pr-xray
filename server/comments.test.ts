@@ -60,7 +60,7 @@ describe("submitting a review", () => {
 
   it("records the posted comments and clears the drafts", async () => {
     const { comments, rows, store } = setup([draft("a")]);
-    await expect(comments.submitReview(ref, "COMMENT", "")).resolves.toEqual({ posted: 1 });
+    await expect(comments.submitReview(ref, "head", "COMMENT", "")).resolves.toEqual({ posted: 1 });
     expect(rows.current).toEqual([]);
     expect(store.insertComment).toHaveBeenCalledTimes(1);
   });
@@ -68,7 +68,7 @@ describe("submitting a review", () => {
   it("does not leave drafts to post again when reading the comments back fails", async () => {
     const { comments, rows, github } = setup([draft("a")]);
     github.reviewComments.mockRejectedValueOnce(new Error("GitHub is down"));
-    await expect(comments.submitReview(ref, "COMMENT", "")).resolves.toEqual({ posted: 1 });
+    await expect(comments.submitReview(ref, "head", "COMMENT", "")).resolves.toEqual({ posted: 1 });
     expect(rows.current).toEqual([]);
   });
 
@@ -78,13 +78,25 @@ describe("submitting a review", () => {
       rows.current = [...rows.current, draft("b")];
       return 42;
     });
-    await comments.submitReview(ref, "COMMENT", "");
+    await comments.submitReview(ref, "head", "COMMENT", "");
     expect(rows.current.map((row) => row.id)).toEqual(["b"]);
+  });
+
+  it("refuses an approval when the PR moved past the commit the reviewer saw", async () => {
+    const { comments, github } = setup([]);
+    await expect(comments.submitReview(ref, "seen", "APPROVE", "")).rejects.toThrow("new commits");
+    expect(github.submitReview).not.toHaveBeenCalled();
+  });
+
+  it("records the review on the commit the reviewer saw", async () => {
+    const { comments, github } = setup([]);
+    await comments.submitReview(ref, "head", "APPROVE", "");
+    expect(github.submitReview).toHaveBeenCalledWith(ref, "head", "APPROVE", "", []);
   });
 
   it("refuses a draft written on an older commit without posting anything", async () => {
     const { comments, rows, github } = setup([draft("a"), draft("b", "old")]);
-    await expect(comments.submitReview(ref, "COMMENT", "")).rejects.toThrow("older commit");
+    await expect(comments.submitReview(ref, "head", "COMMENT", "")).rejects.toThrow("older commit");
     expect(github.submitReview).not.toHaveBeenCalled();
     expect(rows.current).toHaveLength(2);
   });
@@ -124,7 +136,7 @@ describe("submitting a review", () => {
   it("keeps the drafts when GitHub rejects the review", async () => {
     const { comments, rows, github } = setup([draft("a")]);
     github.submitReview.mockRejectedValueOnce(new Error("422"));
-    await expect(comments.submitReview(ref, "COMMENT", "")).rejects.toThrow("422");
+    await expect(comments.submitReview(ref, "head", "COMMENT", "")).rejects.toThrow("422");
     expect(rows.current.map((row) => row.id)).toEqual(["a"]);
   });
 });

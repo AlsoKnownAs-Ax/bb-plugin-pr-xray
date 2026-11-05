@@ -200,6 +200,7 @@ export function createGithub(getSettingsToken: () => Promise<string | undefined>
       baseRef: pr.base.ref,
       viewer: viewer.login,
       isOwnPr: viewer.login.toLowerCase() === (pr.user?.login ?? "").toLowerCase(),
+      changedFiles: pr.changed_files,
       files,
       hunks,
       threads,
@@ -327,14 +328,20 @@ export function splitHunks(patch: string, fileIndex: number, path: string): Hunk
   if (patch === "") return [];
   const lines = patch.split("\n");
   const hunks: Hunk[] = [];
+  const occurrences = new Map<string, number>();
   let current: string[] | null = null;
   const flush = () => {
     if (current === null) return;
     const body = current.slice(1);
+    const functionHeading = current[0]!.replace(/^@@ [^@]*@@ ?/u, "");
+    const content = `${path}\n${functionHeading}\n${body.join("\n")}`;
+    const occurrence = occurrences.get(content) ?? 0;
+    occurrences.set(content, occurrence + 1);
     hunks.push({
       id: `f${fileIndex}h${hunks.length}`,
-      // Path + body without the @@ line numbers, so the hash survives commits that only shift the hunk.
-      fingerprint: createHash("sha1").update(`${path}\n${body.join("\n")}`).digest("hex").slice(0, 20),
+      // No line numbers, so the hash survives commits that only shift the hunk. The function
+      // and occurrence stop a viewed mark from carrying over to a moved or duplicated hunk.
+      fingerprint: createHash("sha1").update(`${content}\n${occurrence}`).digest("hex").slice(0, 20),
       fileIndex,
       header: current[0]!,
       patch: current.join("\n"),
@@ -361,6 +368,7 @@ interface RawPull {
   state: string;
   draft?: boolean;
   merged_at?: string | null;
+  changed_files: number;
   user: { login: string } | null;
   head: { sha: string; ref: string; repo: { full_name: string } | null };
   base: { sha: string; ref: string; repo: { full_name: string } };
