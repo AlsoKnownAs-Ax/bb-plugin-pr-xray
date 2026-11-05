@@ -111,8 +111,8 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   bb.rpc.register(rpcContract, {
-    async "review.get"({ ref }) {
-      const pr = await loadPr(ref);
+    async "review.get"({ ref, fresh }) {
+      const pr = await loadPr(ref, fresh === true);
       store.touchReview(ref, pr.title, pr.url);
       if (store.latestAnalysis(ref, pr.headSha)?.status === "running") await analysis.reconcile();
       const latest = store.latestAnalysis(ref, pr.headSha);
@@ -126,13 +126,17 @@ export default async function plugin(bb: BbPluginApi) {
         pr,
         current,
         completed,
-        viewedHunks: viewedRows.filter((row) => fingerprints.has(row.fingerprint)).map((row) => row.fingerprint),
+        // All of them: the page may be holding an older commit than this one.
+        viewedHunks: viewedRows.map((row) => row.fingerprint),
         changedSinceViewed: [...new Set(viewedRows.filter((row) => !fingerprints.has(row.fingerprint)).map((row) => row.path))],
         pending: store.pendingComments(ref),
         comments: store.commentsForPr(ref),
         ticketUrl: override ?? findTicketUrl(pr.body, values.ticketUrlPattern),
         ticketOverridden: override !== null,
       };
+    },
+    async "review.head"({ ref }) {
+      return { headSha: await github.headSha(ref) };
     },
     "review.recent": () => ({ reviews: store.recentReviews() }),
     "review.setTicket"({ ref, url }) {
@@ -145,23 +149,16 @@ export default async function plugin(bb: BbPluginApi) {
       store.touchReview(ref, pr.title, pr.url);
       return { analysis: await analysis.start(ref, { pr }) };
     },
-    async "hunks.setViewed"({ ref, fingerprints, viewed }) {
-      const pr = await loadPr(ref);
-      const paths = new Map(pr.files.map((file) => [file.index, file.path]));
-      const wanted = new Set(fingerprints);
-      const hunks = pr.hunks
-        .filter((hunk) => wanted.has(hunk.fingerprint))
-        .map((hunk) => ({ path: paths.get(hunk.fileIndex)!, fingerprint: hunk.fingerprint }));
-      store.setHunksViewed(ref, hunks, viewed, new Set(pr.hunks.map((hunk) => hunk.fingerprint)));
+    "hunks.setViewed"({ ref, hunks, current, viewed }) {
+      store.setHunksViewed(ref, hunks, viewed, new Set(current));
       comments.publish(ref);
       return { ok: true };
     },
-    async "file.contents"({ ref, path, previousPath }) {
-      const pr = await loadPr(ref);
+    async "file.contents"({ ref, headSha, path, previousPath }) {
       const baseSha = await github.baseSha(ref);
       const [oldText, newText] = await Promise.all([
         github.fileContent(ref, previousPath ?? path, baseSha),
-        github.fileContent(ref, path, pr.headSha),
+        github.fileContent(ref, path, headSha),
       ]);
       return { old: oldText, new: newText };
     },
