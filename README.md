@@ -18,10 +18,32 @@ Open it with the command palette (**PR X-ray: Review a pull request**; bind a sh
 
 ## Setup
 
-- **GitHub**: uses your `gh` login by default. To use a token instead, create a fine-grained token with *Pull requests: read & write* and *Contents: read*, then set it under Settings → Plugins → PR X-ray (or `bb plugin config pr-xray set githubToken <token>`).
+- **GitHub**: uses your `gh` login by default, so if `gh auth status` shows you're logged in, there's nothing to set up. To use a token instead, see [Create a GitHub token](#create-a-github-token).
 - **Notion**: the analysis agent reads the ticket through your agent provider's Notion connection, so Notion must be connected for the provider you analyse with. The ticket is the first link matching *Ticket URL pattern* in the PR description (default: `notion.so` / `notion.com` links), and the parent project is followed through the *Notion parent project property* relation (default `Project`).
 - **Models**: PR X-ray uses your bb default model unless you choose others under Settings → Plugins → PR X-ray. Analysis and chat share one setting, and AI tagging has its own.
 - **Repository context**: when a bb project on the same machine as bb's server has a git remote matching the PR's repository, the analysis and chat agents read a disposable copy of the PR's commit, never your own checkout. Your checkout and any agents working in it are untouched, and setup scripts from the PR branch don't run. PR X-ray deletes the copy when the agent's thread is archived. An open chat keeps its copy until you reset the chat. Fork PRs, and projects where the copy can't be made, use the diff only, and analyses show a badge saying so. Fix threads also run in a copy, so they need a bb project on that machine, and aren't available for fork PRs. Push a fix before archiving its thread, because unpushed commits go with the copy.
+
+## Create a GitHub token
+
+You only need this if you don't use the `gh` CLI, or want PR X-ray limited to certain repositories.
+
+1. Open [the new token form](https://github.com/settings/personal-access-tokens/new?name=PR+X-ray&description=Used+by+the+PR+X-ray+bb+plugin&contents=read&pull_requests=write), which fills in the name and permissions below. To get there by hand, go to GitHub **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
+2. Under **Expiration**, pick a date. You'll need a new token when it expires.
+3. Under **Resource owner**, choose the user or organization that owns the repositories you review.
+4. Under **Repository access**, choose **Only select repositories** and pick them.
+5. Check the permissions, then click **Generate token** and copy it:
+
+   | Repository permission | Access | Used for |
+   |---|---|---|
+   | Pull requests | Read and write | Reading PRs, posting and editing comments, submitting reviews |
+   | Contents | Read | Showing full files |
+
+   GitHub adds *Metadata: read* itself. PR X-ray doesn't need any other permission.
+6. In bb, paste it under **Settings → Plugins → PR X-ray → GitHub token**. The page should then say *Connected as* your GitHub username.
+
+If the resource owner is an organization that requires approval, the token only reads public resources until an admin approves it.
+
+The token is only for PR X-ray's GitHub requests. A fix agent pushes with the git credentials on your machine, so those need write access to the PR's branch.
 
 ## Security
 
