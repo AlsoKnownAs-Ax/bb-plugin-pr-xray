@@ -130,7 +130,7 @@ export function ExplainTab({
               </div>
               <span className="ml-auto text-xs text-muted-foreground">Click a node to comment · ⌘/Ctrl + scroll to zoom · drag to pan</span>
             </div>
-            {diagram.description ? <p className="text-sm text-muted-foreground">{diagram.description}</p> : null}
+            {diagram.description ? <SafeMarkdown content={diagram.description} className="text-sm text-muted-foreground" /> : null}
             <div className="h-[60vh]">
               <DiagramCanvas
                 diagram={diagram}
@@ -168,7 +168,7 @@ export function ExplainTab({
                       {item.title}
                       <span className="text-[11px] font-normal uppercase">{item.severity}</span>
                     </div>
-                    <p className="text-sm text-muted-foreground">{item.reason}</p>
+                    <SafeMarkdown content={item.reason} className="text-sm text-muted-foreground" />
                     <GroupLinks ids={item.groupIds} />
                   </li>
                 ))}
@@ -205,7 +205,8 @@ export function ExplainTab({
               <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
               <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={(comment) => selectComment(comment)} />
             </div>
-            <div className="border-t border-border p-3">
+            {/* The right padding keeps this clear of the floating chat button. */}
+            <div className="border-t border-border p-3 pr-20">
               <Button className="w-full" size="sm" disabled={open.length === 0} onClick={() => void fixAll()}>
                 <Icon name="Bot" />
                 Fix all diagram comments{open.length ? ` (${open.length})` : ""}

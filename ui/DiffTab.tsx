@@ -17,6 +17,7 @@ import { Icon } from "@/components/ui/icon";
 import { TEXTAREA_CLASS } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { threadsToFix } from "../shared/fix-scope";
+import { SafeMarkdown } from "./SafeMarkdown";
 import type { DraftComment, FixScope, Hunk, PendingComment, PrFile, ReviewGroup, ReviewThread, StoredComment } from "../shared/schema";
 import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
@@ -430,7 +431,7 @@ export function DiffTab({
                     </label>
                   </div>
                 </div>
-                <p className="text-sm text-muted-foreground">{group.why}</p>
+                <SafeMarkdown content={group.why} className="text-sm text-muted-foreground" />
               </header>
               {groupOpen ? (
                 <GroupHunks
