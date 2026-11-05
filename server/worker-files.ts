@@ -32,18 +32,20 @@ export async function removeThreadDir(bb: BbPluginApi, threadId: string): Promis
 
 /** shortcut: an archive during a plugin restart leaves its folder for the OS temp cleaner; sweep on load if these pile up. */
 export function removeFilesWhenArchived(bb: BbPluginApi) {
+  // This fires for every thread in bb, so `tempDir` is what marks one as ours.
   bb.events.on("thread.archived", async ({ thread }) => {
-    await removeThreadDir(bb, thread.id);
-    if (thread.environmentId === null) return;
-    // bb keeps a record for every folder it is pointed at. A fallback worker's environment is shared, so check it's the copy.
     try {
       const { tempDir } = await bb.sdk.threads.getPluginMetadata({ threadId: thread.id });
+      if (typeof tempDir !== "string") return;
+      // Archiving leaves the agent running, and on Windows it keeps its working folder locked.
+      await bb.sdk.threads.stop({ threadId: thread.id }).catch(() => undefined);
+      await removeWorkerDir(tempDir);
+      if (thread.environmentId === null) return;
+      // bb keeps a record for every folder it is pointed at. A fallback worker's environment is shared, so check it's the copy.
       const environment = await bb.sdk.environments.get({ environmentId: thread.environmentId });
-      if (typeof tempDir === "string" && environment.path && dirname(environment.path) === tempDir) {
-        await bb.sdk.environments.delete({ environmentId: thread.environmentId });
-      }
+      if (environment.path && dirname(environment.path) === tempDir) await bb.sdk.environments.delete({ environmentId: thread.environmentId });
     } catch (error) {
-      bb.log.warn(`remove environment of ${thread.id}: ${String(error)}`);
+      bb.log.warn(`clean up after ${thread.id}: ${String(error)}`);
     }
   });
 }

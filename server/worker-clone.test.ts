@@ -9,14 +9,14 @@ import { createWorkerDir, removeFilesWhenArchived, removeWorkerDir } from "./wor
 let root: string;
 
 /** Archives a thread whose files are in `dir`, and returns the mock that removes bb's environment record. */
-async function archiveThread(dir: string, environmentPath: string) {
+async function archiveThread(dir: string | undefined, environmentPath: string, stop = vi.fn(async () => ({}))) {
   const remove = vi.fn(async () => ({ ok: true }));
   let archived: ((event: { thread: { id: string; environmentId: string } }) => Promise<void>) | undefined;
   removeFilesWhenArchived({
     log: { warn: () => undefined },
     events: { on: (_name: string, handler: typeof archived) => (archived = handler) },
     sdk: {
-      threads: { getPluginMetadata: async () => ({ tempDir: dir }) },
+      threads: { getPluginMetadata: async () => (dir === undefined ? {} : { tempDir: dir }), stop },
       environments: { get: async () => ({ path: environmentPath }), delete: remove },
     },
   } as unknown as Parameters<typeof removeFilesWhenArchived>[0]);
@@ -113,6 +113,25 @@ describe("clonePrCommit", () => {
     const removeEnvironment = await archiveThread(dir, join(dir, "repo"));
     expect(existsSync(dir)).toBe(false);
     expect(removeEnvironment).toHaveBeenCalledWith({ environmentId: "env_1" });
+  });
+
+  it("stops the agent first, because a running agent keeps the folder locked on Windows", async () => {
+    const dir = await createWorkerDir();
+    let existedWhenStopped = false;
+    const stop = vi.fn(async () => {
+      existedWhenStopped = existsSync(dir);
+      return {};
+    });
+    await archiveThread(dir, join(dir, "repo"), stop);
+    expect(existedWhenStopped).toBe(true);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it("leaves other threads in bb alone", async () => {
+    const stop = vi.fn(async () => ({}));
+    const removeEnvironment = await archiveThread(undefined, join(root, "someone-elses"), stop);
+    expect(stop).not.toHaveBeenCalled();
+    expect(removeEnvironment).not.toHaveBeenCalled();
   });
 
   it("never removes an environment that isn't the thread's own copy", async () => {
