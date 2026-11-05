@@ -7,6 +7,7 @@ export interface ProjectMatch {
   projectName: string;
   hostId: string | null;
   path: string | null;
+  remoteUrl: string | null;
 }
 
 function normalizeRemote(url: string): string | null {
@@ -28,6 +29,7 @@ export async function findProject(bb: BbPluginApi, ref: PrRef): Promise<ProjectM
       projectName: project.name,
       hostId: source?.hostId ?? null,
       path: source?.type === "local_path" ? (source.path ?? null) : null,
+      remoteUrl: remote,
     };
   }
   return null;

@@ -19,7 +19,7 @@ Use the command palette or the PR X-ray page in the nav rail, ask any agent to "
 
 ## Security
 
-PR content is untrusted, and a malicious PR can try to prompt-inject the agents that read it. Analysis and chat agents never run in your own checkout: they use a disposable worktree of the PR branch, or no repository for fork PRs. They are told to stay off the network, but that instruction is not a security boundary.
+PR content is untrusted, and a malicious PR can try to prompt-inject the agents that read it. Analysis and chat agents never run in your own checkout: they use a disposable copy of the PR's commit, so setup scripts on the branch don't run, or no repository for fork PRs. They are told to stay off the network, but that instruction is not a security boundary.
 
 **With Codex, these agents have network access.** bb's Codex workspace sandbox always allows it and PR X-ray can't turn it off, so an injected agent could reach the internet, run `gh` with your login and read files on your machine. Other providers depend on their own sandbox and approval settings.
 
