@@ -2,11 +2,27 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clonePrCommit } from "./worker-clone";
 import { createWorkerDir, removeFilesWhenArchived, removeWorkerDir } from "./worker-files";
 
 let root: string;
+
+/** Archives a thread whose files are in `dir`, and returns the mock that removes bb's environment record. */
+async function archiveThread(dir: string, environmentPath: string) {
+  const remove = vi.fn(async () => ({ ok: true }));
+  let archived: ((event: { thread: { id: string; environmentId: string } }) => Promise<void>) | undefined;
+  removeFilesWhenArchived({
+    log: { warn: () => undefined },
+    events: { on: (_name: string, handler: typeof archived) => (archived = handler) },
+    sdk: {
+      threads: { getPluginMetadata: async () => ({ tempDir: dir }) },
+      environments: { get: async () => ({ path: environmentPath }), delete: remove },
+    },
+  } as unknown as Parameters<typeof removeFilesWhenArchived>[0]);
+  await archived!({ thread: { id: "thr_1", environmentId: "env_1" } });
+  return remove;
+}
 const git = (cwd: string, ...args: string[]) => execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
 
 function repo(name: string): string {
@@ -94,14 +110,15 @@ describe("clonePrCommit", () => {
     const headSha = commit(source, "a.txt", "x");
     const dir = await createWorkerDir();
     await clonePrCommit({ projectPath: source, remoteUrl: "u", headSha, dir });
-    let archived: ((event: { thread: { id: string } }) => Promise<void>) | undefined;
-    removeFilesWhenArchived({
-      log: { warn: () => undefined },
-      events: { on: (_name: string, handler: typeof archived) => (archived = handler) },
-      sdk: { threads: { getPluginMetadata: async () => ({ tempDir: dir }) } },
-    } as unknown as Parameters<typeof removeFilesWhenArchived>[0]);
-    await archived!({ thread: { id: "thr_1" } });
+    const removeEnvironment = await archiveThread(dir, join(dir, "repo"));
     expect(existsSync(dir)).toBe(false);
+    expect(removeEnvironment).toHaveBeenCalledWith({ environmentId: "env_1" });
+  });
+
+  it("never removes an environment that isn't the thread's own copy", async () => {
+    const dir = await createWorkerDir();
+    const removeEnvironment = await archiveThread(dir, join(root, "personal-workspace"));
+    expect(removeEnvironment).not.toHaveBeenCalled();
   });
 
   it("refuses anything that isn't a commit id", async () => {

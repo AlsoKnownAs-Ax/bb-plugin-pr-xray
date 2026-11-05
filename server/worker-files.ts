@@ -34,5 +34,16 @@ export async function removeThreadDir(bb: BbPluginApi, threadId: string): Promis
 export function removeFilesWhenArchived(bb: BbPluginApi) {
   bb.events.on("thread.archived", async ({ thread }) => {
     await removeThreadDir(bb, thread.id);
+    if (thread.environmentId === null) return;
+    // bb keeps a record for every folder it is pointed at. A fallback worker's environment is shared, so check it's the copy.
+    try {
+      const { tempDir } = await bb.sdk.threads.getPluginMetadata({ threadId: thread.id });
+      const environment = await bb.sdk.environments.get({ environmentId: thread.environmentId });
+      if (typeof tempDir === "string" && environment.path && dirname(environment.path) === tempDir) {
+        await bb.sdk.environments.delete({ environmentId: thread.environmentId });
+      }
+    } catch (error) {
+      bb.log.warn(`remove environment of ${thread.id}: ${String(error)}`);
+    }
   });
 }
