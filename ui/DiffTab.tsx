@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { CONTROL_HOVER_TRANSITION } from "@/components/ui/motion";
 import { TEXTAREA_CLASS } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { threadsToFix } from "../shared/fix-scope";
@@ -29,6 +30,8 @@ import { canKeepDraft, draftInDiff, filesNotShown, firstChangedLine, hunkFileDif
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
 
 export type ViewMode = "unified" | "split";
+/** What the sidebar lists: the reading path or the File tree. */
+type SidebarView = "path" | "files";
 
 interface DraftTarget {
   /** The commit on screen when the line was picked: the line number only holds there. */
@@ -204,7 +207,7 @@ export function DiffTab({
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
-  const [sidebar, setSidebar] = useState<"path" | "files">(() => (localStorage.getItem("pr-xray:sidebar") === "files" ? "files" : "path"));
+  const [sidebar, setSidebar] = useState<SidebarView>(() => (localStorage.getItem("pr-xray:sidebar") === "files" ? "files" : "path"));
   useEffect(() => localStorage.setItem("pr-xray:sidebar", sidebar), [sidebar]);
   const toggleSidebar = useCallback(() => setSidebar((current) => (current === "path" ? "files" : "path")), []);
 
@@ -371,14 +374,17 @@ export function DiffTab({
     <div className="flex h-full min-h-0">
       <aside className="flex w-72 shrink-0 flex-col border-r border-border">
         <div className="space-y-2 border-b border-border p-3">
-          <div role="tablist" aria-label="Sidebar" className="flex gap-1 rounded-md border border-border p-0.5 text-xs">
-            {(["path", "files"] as const).map((value) => (
+          <div role="group" aria-label="Sidebar" className="flex gap-1 rounded-md border border-border p-0.5 text-xs">
+            {(["path", "files"] satisfies SidebarView[]).map((value) => (
               <button
                 key={value}
                 type="button"
-                role="tab"
-                aria-selected={sidebar === value}
-                className={cn("flex-1 rounded px-2 py-0.5", sidebar === value ? "bg-state-active" : "text-muted-foreground hover:bg-state-hover")}
+                aria-pressed={sidebar === value}
+                className={cn(
+                  "flex-1 rounded px-2 py-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  CONTROL_HOVER_TRANSITION,
+                  sidebar === value ? "bg-state-active" : "text-muted-foreground hover:bg-state-hover",
+                )}
                 onClick={() => setSidebar(value)}
               >
                 {value === "path" ? "Reading path" : "Files"}
