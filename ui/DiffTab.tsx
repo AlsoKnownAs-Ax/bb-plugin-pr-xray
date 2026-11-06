@@ -207,8 +207,6 @@ export function DiffTab({
   const [sidebar, setSidebar] = useState<"path" | "files">(() => (localStorage.getItem("pr-xray:sidebar") === "files" ? "files" : "path"));
   useEffect(() => localStorage.setItem("pr-xray:sidebar", sidebar), [sidebar]);
   const toggleSidebar = useCallback(() => setSidebar((current) => (current === "path" ? "files" : "path")), []);
-  // shortcut: files without hunks (binary, oversized) have nowhere to jump, so they're left out until #19 gives them a row.
-  const treeFiles = useMemo(() => pr.files.filter((file) => file.hunkIds.length > 0), [pr.files]);
 
   /** Jumps to the file in reading-path group `groupNumber` (default: its first appearance), opening it if viewed. */
   const openFile = (path: string, groupNumber?: number) => {
@@ -382,7 +380,7 @@ export function DiffTab({
           ) : null}
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-          {sidebar === "files" ? <FileTree files={treeFiles} groupsOfPath={groupNumbers} onOpen={openFile} /> : null}
+          {sidebar === "files" ? <FileTree files={pr.files} groupsOfPath={groupNumbers} onOpen={openFile} prUrl={pr.url} unlisted={filesNotShown(pr).unlisted} /> : null}
           {sidebar === "path" && groups.map((group, index) => (
             <div
               key={group.id}
