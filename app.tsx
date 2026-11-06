@@ -4,11 +4,13 @@ import { definePluginApp, type PluginNavPanelProps } from "@get-bb/plugin-sdk/ap
 import { parsePrSubPath, REVIEW_PANEL_PATH } from "./shared/pr-ref";
 import { HomePage } from "./ui/HomePage";
 import { OpenPrDialog } from "./ui/OpenPrDialog";
+import { PrLensPrototype } from "./ui/PrLensPrototype";
 import { ReviewPage } from "./ui/ReviewPage";
 import { SettingsSection } from "./ui/SettingsSection";
 import { uiStore } from "./ui/store";
 
 function ReviewPanel({ subPath }: PluginNavPanelProps) {
+  if (subPath === "prototype-pr-lens") return <PrLensPrototype />; // PROTOTYPE (issue #27)
   const ref = parsePrSubPath(subPath);
   if (ref === null) return <HomePage />;
   return <ReviewPage key={subPath} prRef={ref} />;

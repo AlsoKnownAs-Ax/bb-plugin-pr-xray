@@ -61,6 +61,10 @@ export function HomePage() {
             Paste a pull request to see its diff grouped by concern, with a visual explanation of the change.
           </p>
         </div>
+        {/* PROTOTYPE (issue #27): entry to the PR Lens prototype. */}
+        <Button variant="outline" size="sm" onClick={() => navigate.toPluginPanel(REVIEW_PANEL_PATH, { subPath: "prototype-pr-lens" })}>
+          PR Lens prototype
+        </Button>
         <form onSubmit={submit} className="flex items-center gap-2">
           <Input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://github.com/owner/repo/pull/123" autoFocus />
           <Button type="submit" disabled={url.trim() === ""}>
