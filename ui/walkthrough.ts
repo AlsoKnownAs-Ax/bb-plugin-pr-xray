@@ -37,9 +37,8 @@ function stageTab(stage: WalkthroughStep["stage"]): string | undefined {
 
 /** Where a flow-step, view or flow cite leads; null for other cites, or ones with no diagram. */
 export function citeTarget(doc: GraphDoc, tabs: DiagramTab[], ref: CiteRef): Target | null {
-  const isTab = (id: string | undefined) => tabs.some((tab) => tab.id === id);
   if (ref.kind === "message" || ref.kind === "flow") {
-    if (!isTab(ref.flow)) {
+    if (!hasTab(tabs, ref.flow)) {
       return null;
     }
 
@@ -50,19 +49,27 @@ export function citeTarget(doc: GraphDoc, tabs: DiagramTab[], ref: CiteRef): Tar
     return null;
   }
 
-  if (isTab(ref.view)) {
-    return { tab: ref.view, focus: ALL };
+  return viewTarget(doc, tabs, ref.view);
+}
+
+function hasTab(tabs: DiagramTab[], id: string | undefined): boolean {
+  return tabs.some((tab) => tab.id === id);
+}
+
+/** A cited view's own tab; else a flow view shows its flow, a drill-down shows its selection on its lens's tab. */
+function viewTarget(doc: GraphDoc, tabs: DiagramTab[], id: string): Target | null {
+  if (hasTab(tabs, id)) {
+    return { tab: id, focus: ALL };
   }
 
-  // A view with no tab: a flow view shows its flow, a drill-down shows its selection on its lens's tab.
-  const view = findView(doc.views, ref.view);
+  const view = findView(doc.views, id);
   if (!view) {
     return null;
   }
 
   if (view.lens === "data-flow") {
     const flow = viewFlow(doc, view);
-    if (!isTab(flow)) {
+    if (!hasTab(tabs, flow)) {
       return null;
     }
 
@@ -163,16 +170,17 @@ export function unionBox(boxes: Box[]): Box | null {
 
 /** The step an arrow key selects (`current` null = "All"); undefined for any other key. */
 export function stepForKey(key: string, current: number | null, count: number): number | undefined {
-  if (key === "ArrowLeft") {
-    return Math.max(0, (current ?? 0) - 1);
-  }
-
-  if (key !== "ArrowRight") {
+  if (key !== "ArrowLeft" && key !== "ArrowRight") {
     return undefined;
   }
 
+  // Either arrow from "All" starts at the first step.
   if (current === null) {
     return 0;
+  }
+
+  if (key === "ArrowLeft") {
+    return Math.max(0, current - 1);
   }
 
   return Math.min(count - 1, current + 1);
