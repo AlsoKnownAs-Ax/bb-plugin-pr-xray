@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Icon } from "@/components/ui/icon";
+import { CONTROL_HOVER_TRANSITION } from "@/components/ui/motion";
 import { TEXTAREA_CLASS } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { threadsToFix } from "../shared/fix-scope";
@@ -22,11 +23,15 @@ import type { DraftComment, FixScope, Hunk, PendingComment, PrFile, ReviewGroup,
 import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
 import { FixCommentsButton } from "./FixCommentsButton";
+import { FileTree } from "./FileTree";
+import { buildGroupsOfPath, topmostPath, viewedPaths } from "./file-tree";
 import { prRefKey } from "../shared/pr-ref";
 import { canKeepDraft, draftInDiff, filesNotShown, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
 
 export type ViewMode = "unified" | "split";
+/** What the sidebar lists: the reading path or the File tree. */
+type SidebarView = "path" | "files";
 
 interface DraftTarget {
   /** The commit on screen when the line was picked: the line number only holds there. */
@@ -107,6 +112,8 @@ export function DiffTab({
     }
     return map;
   }, [files, groups, hunks]);
+
+  const groupsOfPath = useMemo(() => buildGroupsOfPath(groups.map((group) => groupPaths.get(group.id) ?? [])), [groupPaths, groups]);
 
   /** Group ids and fileKeys whose hunks are all viewed. */
   const viewed = useMemo(() => {
@@ -200,6 +207,20 @@ export function DiffTab({
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  const [sidebar, setSidebar] = useState<SidebarView>(() => (localStorage.getItem("pr-xray:sidebar") === "files" ? "files" : "path"));
+  useEffect(() => localStorage.setItem("pr-xray:sidebar", sidebar), [sidebar]);
+  const toggleSidebar = useCallback(() => setSidebar((current) => (current === "path" ? "files" : "path")), []);
+
+  /** Jumps to the file in reading-path group `groupNumber` (default: its first appearance), opening it if viewed. */
+  const openFile = (path: string, groupNumber?: number) => {
+    const group = groupNumber ? groups[groupNumber - 1] : groups.find((candidate) => groupPaths.get(candidate.id)?.includes(path));
+    if (!group) return;
+    setOpen(group.id, true);
+    setOpen(fileKey(group.id, path), true);
+    // Wait a frame so a just-expanded group has laid out before scrolling.
+    requestAnimationFrame(() => scrollTo(`file-${fileKey(group.id, path)}`));
+  };
+
   useEffect(() => {
     if (scrollRequest) scrollTo(`group-${scrollRequest.groupId}`);
   }, [scrollRequest, scrollTo]);
@@ -219,6 +240,32 @@ export function DiffTab({
     root.querySelectorAll("[data-group-id]").forEach((element) => observer.observe(element));
     return () => observer.disconnect();
   }, [groups, onActiveGroupChange]);
+
+  // Track which file is on screen for the File tree. Follows file sections, not groups, so it
+  // works with or without an analysis and keeps its path when analysis groups replace the fallback.
+  const [activePath, setActivePath] = useState<string | null>(null);
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    // Each callback only reports sections that changed, so remember every one still on screen.
+    const onScreen = new Set<Element>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) onScreen.add(entry.target);
+          else onScreen.delete(entry.target);
+        }
+        // Measure now: tops recorded in earlier callbacks are stale after scrolling.
+        const path = topmostPath([...onScreen].map((element) => ({ path: element.getAttribute("data-file-path") ?? "", top: element.getBoundingClientRect().top })));
+        if (path) setActivePath(path);
+      },
+      { root, rootMargin: "0px 0px -70% 0px" },
+    );
+    root.querySelectorAll("[data-file-path]").forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+    // Re-observe when file sections mount or unmount (groups change, expand or collapse).
+  }, [groups, openOverride, viewed]);
+  const treeViewed = useMemo(() => viewedPaths(pr.files, hunks, viewedHunks), [hunks, pr.files, viewedHunks]);
 
   // Keyboard: j/k hunks, n/p groups, c comment on the current hunk, v toggles it viewed.
   useEffect(() => {
@@ -247,6 +294,9 @@ export function DiffTab({
           onSetViewed([hunk.fingerprint], !viewedHunks.has(hunk.fingerprint));
           event.preventDefault();
         }
+      } else if (event.key === "t") {
+        toggleSidebar();
+        event.preventDefault();
       } else if (event.key === "c") {
         const hunk = hunks.get(activeHunk ?? groups.find((group) => group.id === activeGroupId)?.hunkIds[0] ?? "");
         const file = hunk ? files.get(hunk.fileIndex) : undefined;
@@ -259,7 +309,7 @@ export function DiffTab({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeHunk, activeGroupId, files, groups, hunkOrder, hunks, onSetViewed, scrollTo, viewedHunks]);
+  }, [activeHunk, activeGroupId, files, groups, hunkOrder, hunks, onSetViewed, scrollTo, toggleSidebar, viewedHunks]);
 
   const anchoredThreadIds = useMemo(() => {
     const ids = new Set<string>();
@@ -324,8 +374,25 @@ export function DiffTab({
     <div className="flex h-full min-h-0">
       <aside className="flex w-72 shrink-0 flex-col border-r border-border">
         <div className="space-y-2 border-b border-border p-3">
+          <div role="group" aria-label="Sidebar" className="flex gap-1 rounded-md border border-border p-0.5 text-xs">
+            {(["path", "files"] satisfies SidebarView[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={sidebar === value}
+                className={cn(
+                  "flex-1 rounded px-2 py-0.5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                  CONTROL_HOVER_TRANSITION,
+                  sidebar === value ? "bg-state-active" : "text-muted-foreground hover:bg-state-hover",
+                )}
+                onClick={() => setSidebar(value)}
+              >
+                {value === "path" ? "Reading path" : "Files"}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Reading path</span>
+            <span>Progress</span>
             <span>
               {viewedCount}/{groups.length} viewed
             </span>
@@ -345,7 +412,18 @@ export function DiffTab({
           ) : null}
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-          {groups.map((group, index) => (
+          {sidebar === "files" ? (
+            <FileTree
+              files={pr.files}
+              groupsOfPath={groupsOfPath}
+              onOpen={openFile}
+              prUrl={pr.url}
+              unlisted={filesNotShown(pr).unlisted}
+              viewed={treeViewed}
+              activePath={activePath}
+            />
+          ) : null}
+          {sidebar === "path" && groups.map((group, index) => (
             <div
               key={group.id}
               className={cn(
@@ -396,7 +474,7 @@ export function DiffTab({
             {data.pending.length > 0 ? `Submit review (${data.pending.length})` : "Submit review"}
           </Button>
           <FixCommentsButton counts={{ mine: myOpenThreads, all: allOpenThreads }} onFix={(scope) => void fixComments(scope)} />
-          <p className="text-[11px] text-muted-foreground">j/k hunks · n/p groups · c comment · v viewed · f focus · 1/2 tabs</p>
+          <p className="text-[11px] text-muted-foreground">j/k hunks · n/p groups · c comment · v viewed · t files · f focus · 1/2 tabs</p>
         </div>
       </aside>
 
@@ -584,7 +662,7 @@ function GroupHunks({
           data.pr.threads.filter((thread) => !thread.isResolved && threadVisibleIn(thread, file.path, fileHunks)).length +
           data.pending.filter((comment) => comment.path === file.path && draftInDiff(comment, data.pr.headSha, fileHunks)).length;
         return (
-          <div key={fileIndex} id={`file-${fileKey(group.id, file.path)}`} className="scroll-mt-0 rounded-lg border border-border">
+          <div key={fileIndex} id={`file-${fileKey(group.id, file.path)}`} data-file-path={file.path} className="scroll-mt-0 rounded-lg border border-border">
             {/* Sticky so Viewed stays reachable while scrolling a long file. */}
             <div className={cn("sticky top-0 z-10 rounded-t-lg bg-background", !open && "rounded-b-lg")}>
               <div
