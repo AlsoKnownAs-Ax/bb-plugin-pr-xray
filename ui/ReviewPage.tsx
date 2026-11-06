@@ -64,7 +64,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
   const [view, setView] = useState<ViewMode>(() => (localStorage.getItem("pr-xray:view") as ViewMode) ?? "unified");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [scrollRequest, setScrollRequest] = useState<{ groupId: string; nonce: number } | null>(null);
-  const [fileRequest, setFileRequest] = useState<{ path: string; nonce: number } | null>(null);
+  const [fileRequest, setFileRequest] = useState<string | null>(null);
   const [localViewed, setLocalViewed] = useState<Map<string, boolean>>(new Map());
   const [chatRequest, setChatRequest] = useState<{ threadId: string; nonce: number } | null>(null);
   const [editingTicket, setEditingTicket] = useState(false);
@@ -286,6 +286,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             onActiveGroupChange={setActiveGroupId}
             scrollRequest={scrollRequest}
             fileRequest={fileRequest}
+            onFileRequestHandled={() => setFileRequest(null)}
           />
         ) : analysis?.result ? (
           <ExplainTab
@@ -299,8 +300,9 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             }}
             onOpenFile={(path) => {
               setTab("diff");
-              setFileRequest({ path, nonce: Date.now() });
+              setFileRequest(path);
             }}
+            onReanalyse={() => void reanalyse()}
           />
         ) : running ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">

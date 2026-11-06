@@ -1,6 +1,6 @@
 // The visual explanation: PR Lens diagrams with pinned design comments, and
 // what to look at closely.
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { experimental_useCodeTheme as useCodeTheme, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
 import { citeTarget, focusBox, nodeTab, stepTarget, type Focus, type Target } from "./walkthrough";
 import { WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel } from "./WalkthroughPanel";
-import type { CiteRef } from "@coldtea/pr-lens-schema";
+import type { CiteRef, GraphDoc } from "@coldtea/pr-lens-schema";
 
 const SEVERITY_STYLE = {
   high: "border-destructive/60 text-destructive",
@@ -24,35 +24,63 @@ const SEVERITY_STYLE = {
   low: "border-border text-muted-foreground",
 } as const;
 
-export function ExplainTab({
-  data,
-  analysis,
-  rpc,
-  groups,
-  onOpenGroup,
-  onOpenFile,
-}: {
+type Result = NonNullable<AnalysisRecord["result"]>;
+
+type ExplainTabProps = {
   data: ReviewGet;
   analysis: AnalysisRecord;
   rpc: Rpc;
   groups: ReviewGroup[];
   onOpenGroup: (groupId: string) => void;
   onOpenFile: (path: string) => void;
-}) {
-  const result = analysis.result!;
+  onReanalyse: () => void;
+};
+
+export function ExplainTab(props: ExplainTabProps) {
+  const result = props.analysis.result!;
+  const { graph, renders } = result;
+  if (graph && renders) {
+    return <DiagramExplain {...props} graph={graph} renders={renders} />;
+  }
+
+  // A legacy analysis: its summary and look-closely still hold; only the diagrams need a re-run.
+  return (
+    <div className="h-full overflow-y-auto">
+      <Explanation result={result} groups={props.groups} onOpenGroup={props.onOpenGroup}>
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-border p-6 text-sm text-muted-foreground">
+          Re-run analysis to see the new diagrams.
+          <Button size="sm" variant="outline" onClick={props.onReanalyse}>
+            <Icon name="Sparkles" />
+            Re-run analysis
+          </Button>
+        </div>
+      </Explanation>
+    </div>
+  );
+}
+
+function DiagramExplain({
+  data,
+  analysis,
+  rpc,
+  groups,
+  onOpenGroup,
+  onOpenFile,
+  graph,
+  renders,
+}: ExplainTabProps & { graph: GraphDoc; renders: NonNullable<Result["renders"]> }) {
   const navigate = useBbNavigate();
   const theme = useCodeTheme().mode;
-  const groupTitles = useMemo(() => new Map(groups.map((group) => [group.id, group.title])), [groups]);
-  const tabs = useMemo(() => diagramTabs(result.graph), [result.graph]);
+  const tabs = useMemo(() => diagramTabs(graph), [graph]);
   const [tabId, setTabId] = useState(tabs[0]!.id);
   const tab = tabs.find((candidate) => candidate.id === tabId) ?? tabs[0]!;
-  const render = result.renders[tab.id]?.[theme];
+  const render = renders[tab.id]?.[theme];
   const diagramComments = data.comments.filter((comment) => comment.source === "diagram");
-  const targets = render ? overlayTargets(result.graph, tab, render.atlas, diagramComments) : [];
+  const targets = render ? overlayTargets(graph, tab, render.atlas, diagramComments) : [];
   // A node or table on the current tab, by id.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = targets.find((target) => target.id === selectedId);
-  const steps = result.graph.walkthrough?.steps ?? [];
+  const steps = graph.walkthrough?.steps ?? [];
   const [step, setStep] = useState<number | null>(null);
   const [focus, setFocus] = useState<Focus>({ kind: "all" });
   const zoomBox = render ? focusBox(focus, render.atlas, tab.flow) : null;
@@ -70,7 +98,7 @@ export function ExplainTab({
     if (ref.kind === "file") return () => onOpenFile(ref.path);
     // Node and table cites open the node panel; column cites stay plain text.
     if (ref.kind === "node" || ref.kind === "table") {
-      const onTab = nodeTab(result.graph, tabs, tab.id, ref.kind === "node" ? ref.node : ref.table);
+      const onTab = nodeTab(graph, tabs, tab.id, ref.kind === "node" ? ref.node : ref.table);
       return onTab
         ? () => {
             // The step's zoom belongs to its own tab; drop it when switching away.
@@ -80,7 +108,7 @@ export function ExplainTab({
           }
         : null;
     }
-    const target = citeTarget(result.graph, tabs, ref);
+    const target = citeTarget(graph, tabs, ref);
     return target ? () => show(target) : null;
   };
 
@@ -98,25 +126,6 @@ export function ExplainTab({
     }
   };
 
-  const GroupLinks = ({ ids }: { ids: string[] }) =>
-    ids.length === 0 ? null : (
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
-        {ids
-          .filter((id) => groupTitles.has(id))
-          .map((id) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onOpenGroup(id)}
-              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-state-hover hover:text-foreground"
-            >
-              <Icon name="FileDiff" className="size-3" />
-              {groupTitles.get(id)}
-            </button>
-          ))}
-      </div>
-    );
-
   const open = diagramComments.filter((comment) => comment.status === "open");
   const outdated = diagramComments.filter((comment) => comment.status === "outdated");
   const resolved = diagramComments.filter((comment) => comment.status === "resolved");
@@ -124,27 +133,16 @@ export function ExplainTab({
     if (!tabs.some((candidate) => candidate.id === comment.diagramId)) return;
     setTabId(comment.diagramId!);
     setSelectedId(comment.nodeId);
+    selectStep(null);
   };
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="min-w-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
-          <section className="space-y-2">
-            <h2 className="text-base font-semibold">What this PR does</h2>
-            <SafeMarkdown content={result.summary} />
-            {result.ticket.url ? (
-              <p className="text-xs text-muted-foreground">
-                Ticket:{" "}
-                <a className="underline" href={result.ticket.url} target="_blank" rel="noreferrer">
-                  {result.ticket.title ?? result.ticket.url}
-                </a>
-                {result.ticket.projectTitle ? ` · Project: ${result.ticket.projectTitle}` : ""}
-              </p>
-            ) : null}
-          </section>
-
-          <section className="space-y-3">
+      {/* A size container, so the diagram area can take the column's visible height. */}
+      <div className="min-w-0 flex-1 overflow-y-auto [container-type:size]">
+        <Explanation result={analysis.result!} groups={groups} onOpenGroup={onOpenGroup}>
+          {/* The column's height less its padding, so the canvas fills the view once scrolled to. */}
+          <section className="flex h-[calc(100cqh-2rem)] flex-col gap-3 md:h-[calc(100cqh-3rem)]">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold">Diagrams</h2>
               <div className="flex flex-wrap gap-1">
@@ -166,7 +164,7 @@ export function ExplainTab({
               </div>
               <span className="ml-auto text-xs text-muted-foreground">⌘/Ctrl + scroll to zoom · drag to pan</span>
             </div>
-            <div className="relative h-[60vh] overflow-hidden rounded-lg border border-border">
+            <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border">
               {render ? (
                 <DiagramCanvas
                   key={tab.id}
@@ -183,25 +181,7 @@ export function ExplainTab({
               {steps.length ? <WalkthroughPanel steps={steps} current={step} onSelect={selectStep} citeAction={citeAction} /> : null}
             </div>
           </section>
-
-          {result.lookClosely.length > 0 ? (
-            <section className="space-y-3">
-              <h2 className="text-base font-semibold">Where to look closely</h2>
-              <ul className="space-y-2">
-                {result.lookClosely.map((item, index) => (
-                  <li key={index} className={cn("rounded-lg border bg-card px-3 py-2", SEVERITY_STYLE[item.severity])}>
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      {item.title}
-                      <span className="text-[11px] font-normal uppercase">{item.severity}</span>
-                    </div>
-                    <SafeMarkdown content={item.reason} className="text-sm text-muted-foreground" />
-                    <GroupLinks ids={item.groupIds} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-        </div>
+        </Explanation>
       </div>
 
       <aside className="flex w-80 shrink-0 flex-col border-l border-border">
@@ -238,6 +218,77 @@ export function ExplainTab({
           </div>
         )}
       </aside>
+    </div>
+  );
+}
+
+/** The summary, then `children` (the diagrams, or the prompt to re-run for them), then what to look at closely. */
+function Explanation({
+  result,
+  groups,
+  onOpenGroup,
+  children,
+}: {
+  result: Result;
+  groups: ReviewGroup[];
+  onOpenGroup: (groupId: string) => void;
+  children: ReactNode;
+}) {
+  const groupTitles = useMemo(() => new Map(groups.map((group) => [group.id, group.title])), [groups]);
+  const GroupLinks = ({ ids }: { ids: string[] }) =>
+    ids.length === 0 ? null : (
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {ids
+          .filter((id) => groupTitles.has(id))
+          .map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onOpenGroup(id)}
+              className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-state-hover hover:text-foreground"
+            >
+              <Icon name="FileDiff" className="size-3" />
+              {groupTitles.get(id)}
+            </button>
+          ))}
+      </div>
+    );
+
+  return (
+    <div className="mx-auto max-w-[1400px] space-y-6 p-4 md:p-6">
+      <section className="space-y-2">
+        <h2 className="text-base font-semibold">What this PR does</h2>
+        <SafeMarkdown content={result.summary} />
+        {result.ticket.url ? (
+          <p className="text-xs text-muted-foreground">
+            Ticket:{" "}
+            <a className="underline" href={result.ticket.url} target="_blank" rel="noreferrer">
+              {result.ticket.title ?? result.ticket.url}
+            </a>
+            {result.ticket.projectTitle ? ` · Project: ${result.ticket.projectTitle}` : ""}
+          </p>
+        ) : null}
+      </section>
+
+      {children}
+
+      {result.lookClosely.length > 0 ? (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold">Where to look closely</h2>
+          <ul className="space-y-2">
+            {result.lookClosely.map((item, index) => (
+              <li key={index} className={cn("rounded-lg border bg-card px-3 py-2", SEVERITY_STYLE[item.severity])}>
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  {item.title}
+                  <span className="text-[11px] font-normal uppercase">{item.severity}</span>
+                </div>
+                <SafeMarkdown content={item.reason} className="text-sm text-muted-foreground" />
+                <GroupLinks ids={item.groupIds} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { PrLensRenderError } from "@coldtea/pr-lens-renderer";
 import { safeParseGraphDoc, type GraphDoc } from "@coldtea/pr-lens-schema";
 import { diagramTabs } from "../shared/diagram-tabs";
-import { analysisSubmissionSchema, type AnalysisResult, type PrDetails, type PrRef } from "../shared/schema";
+import { analysisBaseSchema, type AnalysisResult, type PrDetails, type PrRef } from "../shared/schema";
 import { prRefKey } from "../shared/pr-ref";
 import type { Github } from "./github";
 import type { Models } from "./models";
@@ -127,7 +127,7 @@ type Submission = Omit<AnalysisResult, "renders">;
 
 /** Validates what the analysis agent submits. `pr` is the snapshot it analysed, when still known. */
 export function checkAnalysis(candidate: unknown, pr: PrDetails | null): { ok: true; value: Submission } | { ok: false; problems: string[] } {
-  const parsed = analysisSubmissionSchema.safeParse(candidate);
+  const parsed = analysisBaseSchema.safeParse(candidate);
   const problems = parsed.success
     ? []
     : parsed.error.issues.map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`);

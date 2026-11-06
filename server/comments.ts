@@ -146,8 +146,11 @@ export function createComments(deps: { bb: BbPluginApi; store: Store; github: Gi
   /** After a new analysis, pins whose node or table is no longer on their diagram tab become outdated. */
   function reconcileDiagramPins(analysisId: string) {
     const analysis = store.analysis(analysisId);
-    if (analysis?.result == null) return;
-    const graph = analysis.result.graph;
+    const graph = analysis?.result?.graph;
+    if (!analysis || !graph) {
+      return;
+    }
+
     const live = new Set(
       diagramTabs(graph).flatMap((tab) => [...commentTargets(graph, tab).keys()].map((id) => `${tab.id}/${id}`)),
     );

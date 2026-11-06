@@ -48,34 +48,37 @@ function contextDocument(pr: PrDetails, analysis: AnalysisRecord | null): string
     }
     parts.push("", "### Groups (reading order)");
     for (const group of result.groups) parts.push(`- [${group.id}] ${group.title} (${group.kind}): ${group.why}${stale ? "" : ` Hunks: ${group.hunkIds.join(", ")}`}`);
-    const { graph } = result;
-    parts.push("", "### Walkthrough");
-    (graph.walkthrough?.steps ?? []).forEach((step, index) => {
-      parts.push(`${index + 1}. ${step.heading}: ${step.body}${step.detail ? ` ${step.detail.text}` : ""}`);
-    });
     if (result.lookClosely.length > 0) {
       parts.push("", "### Look closely");
       for (const item of result.lookClosely) parts.push(`- [${item.severity}] ${item.title}: ${item.reason}`);
     }
-    parts.push("", "### Diagram parts (architecture lanes; delta in brackets)");
-    for (const lane of graph.lanes) {
-      parts.push(`- ${lane.label}`);
-      for (const node of graph.nodes.filter((candidate) => candidate.lane === lane.id)) {
-        parts.push(`  - ${node.label} (${node.kind}) [${node.delta}]${node.files.length > 0 ? `: ${node.files.map((file) => file.path).join(", ")}` : ""}`);
-      }
-    }
-    const label = new Map(graph.nodes.map((node) => [node.id, node.label]));
-    for (const flow of graph.flows) {
-      parts.push("", `### Flow: ${flow.title}`);
-      flow.messages.forEach((message, index) => {
-        parts.push(`${index + 1}. ${label.get(message.from) ?? message.from} -> ${label.get(message.to) ?? message.to}: ${message.label} [${message.delta}]`);
+    // A legacy analysis has no graph: re-run it for the walkthrough and diagrams.
+    const { graph } = result;
+    if (graph) {
+      parts.push("", "### Walkthrough");
+      (graph.walkthrough?.steps ?? []).forEach((step, index) => {
+        parts.push(`${index + 1}. ${step.heading}: ${step.body}${step.detail ? ` ${step.detail.text}` : ""}`);
       });
-    }
-    if (graph.dataModel) {
-      parts.push("", "### Data model");
-      for (const table of graph.dataModel.tables) {
-        const changed = table.columns.filter((column) => column.delta !== "unchanged");
-        parts.push(`- ${table.label} [${table.delta}]${changed.length > 0 ? `: ${changed.map((column) => `${column.name} ${column.previousType ? `${column.previousType} -> ` : ""}${column.type} [${column.delta}]`).join(", ")}` : ""}`);
+      parts.push("", "### Diagram parts (architecture lanes; delta in brackets)");
+      for (const lane of graph.lanes) {
+        parts.push(`- ${lane.label}`);
+        for (const node of graph.nodes.filter((candidate) => candidate.lane === lane.id)) {
+          parts.push(`  - ${node.label} (${node.kind}) [${node.delta}]${node.files.length > 0 ? `: ${node.files.map((file) => file.path).join(", ")}` : ""}`);
+        }
+      }
+      const label = new Map(graph.nodes.map((node) => [node.id, node.label]));
+      for (const flow of graph.flows) {
+        parts.push("", `### Flow: ${flow.title}`);
+        flow.messages.forEach((message, index) => {
+          parts.push(`${index + 1}. ${label.get(message.from) ?? message.from} -> ${label.get(message.to) ?? message.to}: ${message.label} [${message.delta}]`);
+        });
+      }
+      if (graph.dataModel) {
+        parts.push("", "### Data model");
+        for (const table of graph.dataModel.tables) {
+          const changed = table.columns.filter((column) => column.delta !== "unchanged");
+          parts.push(`- ${table.label} [${table.delta}]${changed.length > 0 ? `: ${changed.map((column) => `${column.name} ${column.previousType ? `${column.previousType} -> ` : ""}${column.type} [${column.delta}]`).join(", ")}` : ""}`);
+        }
       }
     }
   } else {

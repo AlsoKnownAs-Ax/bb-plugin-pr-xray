@@ -29,7 +29,8 @@ export const reviewGroupSchema = z.object({
 });
 export type ReviewGroup = z.infer<typeof reviewGroupSchema>;
 
-const analysisBaseSchema = z.object({
+/** What the analysis agent submits, besides its `graph`, which the PR Lens parser checks. */
+export const analysisBaseSchema = z.object({
   summary: z.string().min(1).max(4000),
   ticket: z
     .object({
@@ -52,9 +53,6 @@ const analysisBaseSchema = z.object({
     .max(12)
     .default([]),
 });
-
-/** What the analysis agent submits, besides its `graph`, which the PR Lens parser checks. */
-export const analysisSubmissionSchema = analysisBaseSchema;
 
 /** One stored render of a diagram tab in one theme. */
 export const diagramRenderSchema = z.object({
@@ -155,8 +153,9 @@ export const analysisRecordSchema = z.object({
   headSha: z.string(),
   status: z.enum(["running", "done", "failed"]),
   error: z.string().nullable(),
-  result: analysisResultSchema.nullable(),
-  /** A finished analysis stored in a format this version can no longer read: re-run it. */
+  /** For a legacy analysis, only the base fields: no graph or renders. */
+  result: analysisResultSchema.partial({ graph: true, renders: true }).nullable(),
+  /** A finished analysis stored in a format this version can no longer draw: re-run it for diagrams. */
   legacy: z.boolean(),
   /** Hunk id -> content fingerprint when analysed. Null for analyses from before this was saved. */
   hunkFingerprints: z.record(z.string(), z.string()).nullable(),

@@ -71,6 +71,7 @@ export function DiffTab({
   onActiveGroupChange,
   scrollRequest,
   fileRequest,
+  onFileRequestHandled,
 }: {
   data: ReviewGet;
   rpc: Rpc;
@@ -84,7 +85,9 @@ export function DiffTab({
   onActiveGroupChange: (groupId: string) => void;
   scrollRequest: { groupId: string; nonce: number } | null;
   /** A file to open, from a diagram's node panel. */
-  fileRequest: { path: string; nonce: number } | null;
+  fileRequest: string | null;
+  /** Called once the request is handled, so returning to this tab doesn't repeat it. */
+  onFileRequestHandled: () => void;
 }) {
   const { pr } = data;
   const navigate = useBbNavigate();
@@ -228,7 +231,15 @@ export function DiffTab({
   }, [scrollRequest, scrollTo]);
 
   useEffect(() => {
-    if (fileRequest && !openFile(fileRequest.path)) toast.info(`${fileRequest.path} is not changed in this PR.`);
+    if (!fileRequest) {
+      return;
+    }
+
+    if (!openFile(fileRequest)) {
+      toast.info(`${fileRequest} is not changed in this PR.`);
+    }
+
+    onFileRequestHandled();
     // Only a new request opens a file; openFile changes on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fileRequest]);
