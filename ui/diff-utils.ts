@@ -51,42 +51,119 @@ export function filePatch(file: PrFile, hunks: Hunk[]): string {
  */
 export function hunkFileContext(newText: string, fileHunks: Hunk[], target: Hunk): { oldText: string; newText: string; patch: string } | null {
   const newLines = newText.split("\n");
-  const oldLines: string[] = [];
-  let newIndex = 0;
+  const replay: Replay = { oldLines: [], newIndex: 0 };
   for (const hunk of fileHunks) {
     const range = hunkRange(hunk);
-    // An empty side's header names the line before the hunk, not its first line.
-    const gapEnd = range.newEnd < range.newStart ? range.newStart : range.newStart - 1;
-    if (gapEnd < newIndex || gapEnd > newLines.length) return null;
-    oldLines.push(...newLines.slice(newIndex, gapEnd));
-    newIndex = gapEnd;
-    const oldLinesAbove = oldLines.length;
-    const newLinesAbove = newIndex;
-    for (const raw of hunk.patch.split("\n").slice(1)) {
-      if (raw === "" || raw.startsWith("\\")) continue;
-      const text = raw.slice(1);
-      if (raw.startsWith("-")) {
-        oldLines.push(text);
-        continue;
-      }
-      if (newLines[newIndex] !== text) return null;
-      if (!raw.startsWith("+")) oldLines.push(text);
-      newIndex += 1;
+    const above = replayHunk(hunk, range, newLines, replay);
+    if (!above) {
+      return null;
     }
-    if (hunk.id !== target.id) continue;
-    if (oldLines.length !== range.oldEnd || newIndex !== range.newEnd) return null;
-    const sharedAbove = oldLinesAbove <= newLinesAbove ? oldLines.slice(0, oldLinesAbove) : newLines.slice(0, newLinesAbove);
-    const oldHunkLines = oldLines.slice(oldLinesAbove);
-    const newHunkLines = newLines.slice(newLinesAbove, newIndex);
-    const alignedStart = sharedAbove.length + 1;
-    const alignedHeader = `@@ -${alignedStart},${oldHunkLines.length} +${alignedStart},${newHunkLines.length} @@`;
-    return {
-      oldText: `${[...sharedAbove, ...oldHunkLines].join("\n")}\n`,
-      newText: `${[...sharedAbove, ...newHunkLines].join("\n")}\n`,
-      patch: hunk.patch.replace(HEADER, alignedHeader),
-    };
+
+    if (hunk.id !== target.id) {
+      continue;
+    }
+
+    if (replay.oldLines.length !== lastLine(range.oldStart, range.oldEnd) || replay.newIndex !== lastLine(range.newStart, range.newEnd)) {
+      return null;
+    }
+
+    return alignedContext(hunk, newLines, replay, above);
   }
+
   return null;
+}
+
+/** The old side rebuilt so far, and how far into the new side's lines it has got. */
+type Replay = { oldLines: string[]; newIndex: number };
+type LinesAbove = { old: number; new: number };
+
+/** Replays one hunk onto `replay`: the lines above it on each side, or null when the new text doesn't match. */
+function replayHunk(hunk: Hunk, range: HunkRange, newLines: string[], replay: Replay): LinesAbove | null {
+  const gapEnd = linesBefore(range.newStart, range.newEnd);
+  if (gapEnd < replay.newIndex || gapEnd > newLines.length) {
+    return null;
+  }
+
+  replay.oldLines.push(...newLines.slice(replay.newIndex, gapEnd));
+  replay.newIndex = gapEnd;
+  const above = { old: replay.oldLines.length, new: replay.newIndex };
+  const matches = hunk.patch
+    .split("\n")
+    .slice(1)
+    .filter((raw) => raw !== "" && !raw.startsWith("\\"))
+    .every((raw) => replayLine(raw, newLines, replay));
+  if (!matches) {
+    return null;
+  }
+
+  return above;
+}
+
+/** Applies one patch line backwards; false when a context or added line isn't the new text's next line. */
+function replayLine(raw: string, newLines: string[], replay: Replay): boolean {
+  const text = raw.slice(1);
+  if (raw.startsWith("-")) {
+    replay.oldLines.push(text);
+    return true;
+  }
+
+  if (newLines[replay.newIndex] !== text) {
+    return false;
+  }
+
+  if (!raw.startsWith("+")) {
+    replay.oldLines.push(text);
+  }
+
+  replay.newIndex += 1;
+  return true;
+}
+
+// An empty side's header names the line before the hunk, not its first line.
+function linesBefore(start: number, end: number): number {
+  if (end < start) {
+    return start;
+  }
+
+  return start - 1;
+}
+
+function lastLine(start: number, end: number): number {
+  if (end < start) {
+    return start;
+  }
+
+  return end;
+}
+
+function alignedContext(hunk: Hunk, newLines: string[], replay: Replay, above: LinesAbove): { oldText: string; newText: string; patch: string } {
+  const sharedAbove = sharedLinesAbove(replay.oldLines, newLines, above);
+  const oldHunkLines = replay.oldLines.slice(above.old);
+  const newHunkLines = newLines.slice(above.new, replay.newIndex);
+  const start = sharedAbove.length + 1;
+  const header = `@@ -${headerStart(start, oldHunkLines.length)},${oldHunkLines.length} +${headerStart(start, newHunkLines.length)},${newHunkLines.length} @@`;
+  return {
+    oldText: `${[...sharedAbove, ...oldHunkLines].join("\n")}\n`,
+    newText: `${[...sharedAbove, ...newHunkLines].join("\n")}\n`,
+    patch: hunk.patch.replace(HEADER, header),
+  };
+}
+
+/** The shorter side's lines above the hunk, used for both sides. */
+function sharedLinesAbove(oldLines: string[], newLines: string[], above: LinesAbove): string[] {
+  if (above.old <= above.new) {
+    return oldLines.slice(0, above.old);
+  }
+
+  return newLines.slice(0, above.new);
+}
+
+function headerStart(start: number, count: number): number {
+  if (count === 0) {
+    return start - 1;
+  }
+
+  return start;
 }
 
 /**
