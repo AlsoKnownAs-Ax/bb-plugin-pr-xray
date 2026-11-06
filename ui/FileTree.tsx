@@ -3,24 +3,25 @@ import { Icon } from "@/components/ui/icon";
 import { CONTROL_HOVER_TRANSITION } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 import type { PrFile } from "../shared/schema";
-import { buildFileTree, fileStatus, fileTooltip, type FileTreeDir, type FileTreeFile, type FileTreeNode } from "./file-tree";
+import { buildFileTree, fileStatus, fileTooltip, isPatchless, notListedLabel, type FileTreeDir, type FileTreeFile, type FileTreeNode } from "./file-tree";
 
 const ROW = cn("flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pr-1.5 text-left text-xs hover:bg-state-hover", CONTROL_HOVER_TRANSITION);
 const FOCUS = "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 // Only added/deleted get a color; the rest stay quiet.
 const STATUS_CLASS: Record<string, string> = { A: "text-success", D: "text-destructive" };
 
-/** The File tree: the PR's changed files by directory. Clicking a file opens it in the diff. */
+/** The File tree: the PR's changed files by directory. Clicking a file opens it in the diff; patchless ones open GitHub. */
 export function FileTree({
   files,
-  groupsOfPath,
-  onOpen,
-  viewed,
-  activePath,
+  prUrl,
+  unlisted,
+  ...props
 }: {
   files: PrFile[];
   groupsOfPath: Map<string, number[]>;
   onOpen: OnOpen;
+  prUrl: string;
+  unlisted: number;
   /** Paths whose every hunk is viewed. */
   viewed: Set<string>;
   /** The file on screen in the diff. */
@@ -35,9 +36,16 @@ export function FileTree({
       if (!next.delete(path)) next.add(path);
       return next;
     });
+  if (files.length === 0 && unlisted === 0) return <p className="px-2 py-1 text-xs text-muted-foreground">No changed files.</p>;
   return (
     <div className="font-mono">
-      <Rows nodes={tree} closed={closed} onToggle={toggle} groupsOfPath={groupsOfPath} onOpen={onOpen} viewed={viewed} activePath={activePath} />
+      <Rows nodes={tree} closed={closed} onToggle={toggle} prUrl={prUrl} {...props} />
+      {unlisted > 0 ? (
+        <a href={`${prUrl}/files`} target="_blank" rel="noreferrer" className={cn(ROW, "pl-1.5 font-sans text-muted-foreground hover:text-foreground", FOCUS)}>
+          {notListedLabel(unlisted)}
+          <Icon name="ExternalLink" className="size-3 shrink-0" />
+        </a>
+      ) : null}
     </div>
   );
 }
@@ -49,6 +57,7 @@ type RowsProps = {
   onToggle: (path: string) => void;
   groupsOfPath: Map<string, number[]>;
   onOpen: OnOpen;
+  prUrl: string;
   viewed: Set<string>;
   activePath: string | null;
 };
@@ -63,6 +72,7 @@ function Rows({ nodes, ...props }: RowsProps & { nodes: FileTreeNode[] }) {
         node={node}
         groups={props.groupsOfPath.get(node.file.path) ?? []}
         onOpen={props.onOpen}
+        prUrl={props.prUrl}
         viewed={props.viewed.has(node.file.path)}
         active={props.activePath === node.file.path}
       />
@@ -91,21 +101,38 @@ function DirRow({ node, ...props }: RowsProps & { node: FileTreeDir }) {
   );
 }
 
-function FileRow({ node, groups, onOpen, viewed, active }: { node: FileTreeFile; groups: number[]; onOpen: OnOpen; viewed: boolean; active: boolean }) {
+function FileRow({
+  node,
+  groups,
+  onOpen,
+  prUrl,
+  viewed,
+  active,
+}: {
+  node: FileTreeFile;
+  groups: number[];
+  onOpen: OnOpen;
+  prUrl: string;
+  viewed: boolean;
+  active: boolean;
+}) {
   const { file } = node;
   const status = fileStatus(file);
+  const patchless = isPatchless(file);
+  const Name = patchless ? "a" : "button";
+  const action = patchless ? { href: `${prUrl}/files`, target: "_blank", rel: "noreferrer" } : { type: "button" as const, onClick: () => onOpen(file.path) };
   // A div, not a button, so the group chips can be buttons of their own.
   return (
-    <div className={cn(ROW, "pl-1.5", active && "bg-state-active", viewed && "text-muted-foreground")}>
-      <button
-        type="button"
+    <div className={cn(ROW, "pl-1.5", active && "bg-state-active", (patchless || viewed) && "text-muted-foreground")}>
+      <Name
+        {...action}
         title={fileTooltip(file)}
         aria-current={active ? "location" : undefined}
-        onClick={() => onOpen(file.path)}
-        className={cn("min-w-0 flex-1 truncate rounded-sm text-left", FOCUS)}
+        className={cn("flex min-w-0 flex-1 items-center gap-1.5 rounded-sm text-left", FOCUS)}
       >
-        {node.name}
-      </button>
+        <span className="min-w-0 truncate">{node.name}</span>
+        {patchless ? <Icon name="ExternalLink" className="size-3 shrink-0" /> : null}
+      </Name>
       {groups.length > 1
         ? groups.map((n) => (
             <button

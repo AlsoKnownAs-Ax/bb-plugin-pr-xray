@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Hunk, PrFile } from "../shared/schema";
-import { buildFileTree, fileStatus, fileTooltip, groupsOfPath, viewedPaths, type FileTreeNode } from "./file-tree";
+import { buildFileTree, fileStatus, fileTooltip, groupsOfPath, notListedLabel, viewedPaths, type FileTreeNode } from "./file-tree";
 
 const file = (path: string, extra: Partial<PrFile> = {}): PrFile => ({
   index: 0,
@@ -55,6 +55,15 @@ describe("file tree", () => {
   it("shows a change status letter", () => {
     const letter = (status: string) => fileStatus(file("a.ts", { status })).letter;
     expect(["added", "modified", "removed", "renamed", "changed"].map(letter)).toEqual(["A", "M", "D", "R", "M"]);
+  });
+
+  it("tells the reviewer a patchless file isn't in the diff", () => {
+    expect(fileTooltip(file("logo.png", { hasPatch: false, hunkIds: [] }))).toBe("logo.png\nNot shown in this diff. Open on GitHub.");
+  });
+
+  it("counts the files GitHub's listing left out", () => {
+    expect(notListedLabel(1)).toBe("1 more file not listed");
+    expect(notListedLabel(250)).toBe("250 more files not listed");
   });
 });
 

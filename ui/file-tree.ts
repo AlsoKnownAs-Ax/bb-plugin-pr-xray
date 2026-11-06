@@ -43,7 +43,13 @@ export function groupsOfPath(pathsByGroup: string[][]): Map<string, number[]> {
   return map;
 }
 
-export const fileTooltip = (file: PrFile) => (file.previousPath ? `${file.previousPath} → ${file.path}` : file.path);
+export const fileTooltip = (file: PrFile) =>
+  (file.previousPath ? `${file.previousPath} → ${file.path}` : file.path) + (isPatchless(file) ? "\nNot shown in this diff. Open on GitHub." : "");
+
+/** Binary or oversized: GitHub gave no patch, so the file has no hunks to jump to. */
+export const isPatchless = (file: PrFile) => file.hunkIds.length === 0;
+
+export const notListedLabel = (count: number) => `${count} more file${count === 1 ? "" : "s"} not listed`;
 
 const dir = (name: string, path: string): FileTreeDir => ({ kind: "dir", name, path, children: [], additions: 0, deletions: 0 });
 
