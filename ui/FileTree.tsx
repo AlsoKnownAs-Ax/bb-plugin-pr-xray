@@ -3,15 +3,15 @@ import { Icon } from "@/components/ui/icon";
 import { CONTROL_HOVER_TRANSITION } from "@/components/ui/motion";
 import { cn } from "@/lib/utils";
 import type { PrFile } from "../shared/schema";
-import { buildFileTree, fileStatus, fileTooltip, type FileTreeDir, type FileTreeFile, type FileTreeNode } from "./file-tree";
+import { buildFileTree, fileStatus, fileTooltip, isPatchless, notListedLabel, type FileTreeDir, type FileTreeFile, type FileTreeNode } from "./file-tree";
 
 const ROW = cn("flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pr-1.5 text-left text-xs hover:bg-state-hover", CONTROL_HOVER_TRANSITION);
 const FOCUS = "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 // Only added/deleted get a color; the rest stay quiet.
 const STATUS_CLASS: Record<string, string> = { A: "text-success", D: "text-destructive" };
 
-/** The File tree: the PR's changed files by directory. Clicking a file opens it in the diff. */
-export function FileTree({ files, onOpen }: { files: PrFile[]; onOpen: (path: string) => void }) {
+/** The File tree: the PR's changed files by directory. Clicking a file opens it in the diff; patchless ones open GitHub. */
+export function FileTree({ files, onOpen, prUrl, unlisted }: { files: PrFile[]; onOpen: (path: string) => void; prUrl: string; unlisted: number }) {
   const tree = useMemo(() => buildFileTree(files), [files]);
   // Folders start expanded, so track the collapsed ones.
   const [closed, setClosed] = useState<Set<string>>(new Set());
@@ -21,18 +21,25 @@ export function FileTree({ files, onOpen }: { files: PrFile[]; onOpen: (path: st
       if (!next.delete(path)) next.add(path);
       return next;
     });
+  if (files.length === 0 && unlisted === 0) return <p className="px-2 py-1 text-xs text-muted-foreground">No changed files.</p>;
   return (
     <div className="font-mono">
-      <Rows nodes={tree} closed={closed} onToggle={toggle} onOpen={onOpen} />
+      <Rows nodes={tree} closed={closed} onToggle={toggle} onOpen={onOpen} prUrl={prUrl} />
+      {unlisted > 0 ? (
+        <a href={`${prUrl}/files`} target="_blank" rel="noreferrer" className={cn(ROW, "pl-1.5 font-sans text-muted-foreground hover:text-foreground", FOCUS)}>
+          {notListedLabel(unlisted)}
+          <Icon name="ExternalLink" className="size-3 shrink-0" />
+        </a>
+      ) : null}
     </div>
   );
 }
 
-type RowsProps = { closed: Set<string>; onToggle: (path: string) => void; onOpen: (path: string) => void };
+type RowsProps = { closed: Set<string>; onToggle: (path: string) => void; onOpen: (path: string) => void; prUrl: string };
 
 function Rows({ nodes, ...props }: RowsProps & { nodes: FileTreeNode[] }) {
   return nodes.map((node) =>
-    node.kind === "dir" ? <DirRow key={`d:${node.path}`} node={node} {...props} /> : <FileRow key={node.file.path} node={node} onOpen={props.onOpen} />,
+    node.kind === "dir" ? <DirRow key={`d:${node.path}`} node={node} {...props} /> : <FileRow key={node.file.path} node={node} onOpen={props.onOpen} prUrl={props.prUrl} />,
   );
 }
 
@@ -57,17 +64,22 @@ function DirRow({ node, ...props }: RowsProps & { node: FileTreeDir }) {
   );
 }
 
-function FileRow({ node, onOpen }: { node: FileTreeFile; onOpen: (path: string) => void }) {
+function FileRow({ node, onOpen, prUrl }: { node: FileTreeFile; onOpen: (path: string) => void; prUrl: string }) {
   const { file } = node;
   const status = fileStatus(file);
+  const patchless = isPatchless(file);
+  const Row = patchless ? "a" : "button";
+  const action = patchless ? { href: `${prUrl}/files`, target: "_blank", rel: "noreferrer" } : { type: "button" as const, onClick: () => onOpen(file.path) };
   return (
-    <button type="button" title={fileTooltip(file)} onClick={() => onOpen(file.path)} className={cn(ROW, "pl-1.5", FOCUS)}>
-      <span className="min-w-0 flex-1 truncate">{node.name}</span>
+    <Row {...action} title={fileTooltip(file)} className={cn(ROW, "pl-1.5", FOCUS, patchless && "text-muted-foreground")}>
+      <span className="min-w-0 truncate">{node.name}</span>
+      {patchless ? <Icon name="ExternalLink" className="size-3 shrink-0" /> : null}
+      <span className="flex-1" />
       <Counts additions={file.additions} deletions={file.deletions} />
       <span title={status.label} aria-label={status.label} className={cn("w-2.5 shrink-0 text-center text-[10px] font-semibold", STATUS_CLASS[status.letter] ?? "text-muted-foreground")}>
         {status.letter}
       </span>
-    </button>
+    </Row>
   );
 }
 
