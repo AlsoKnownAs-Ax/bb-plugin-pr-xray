@@ -134,6 +134,18 @@ describe("submitting a review", () => {
     expect(github.updateCommentBody).toHaveBeenCalledWith(ref, 9, "New text");
   });
 
+  it("does not read back the comments of a review with no drafts", async () => {
+    const { comments, github } = setup([]);
+    await expect(comments.submitReview(ref, "head", "APPROVE", "")).resolves.toEqual({ posted: 0 });
+    expect(github.reviewComments).not.toHaveBeenCalled();
+  });
+
+  it("tags nothing when the comment is gone", () => {
+    const { comments, store } = setup([]);
+    store.updateComment.mockReturnValueOnce(null as never);
+    expect(comments.setTag("cm_gone", "bug")).toBeNull();
+  });
+
   it("keeps the drafts when GitHub rejects the review", async () => {
     const { comments, rows, github } = setup([draft("a")]);
     github.submitReview.mockRejectedValueOnce(new Error("422"));
@@ -147,17 +159,40 @@ describe("diagram comments", () => {
   const pin = (id: string, diagramId: string, nodeId: string, status = "open") =>
     ({ id, source: "diagram", ref, diagramId, nodeId, status }) as unknown as StoredComment;
 
-  function setup(pins: StoredComment[]) {
+  const current = { id: "an_2", ref, headSha: "head", result: { graph: billingOrgGraph } };
+
+  function setup(pins: StoredComment[], analysis: unknown = current) {
     const store = {
-      analysis: () => ({ id: "an_2", ref, headSha: "head", result: { graph: billingOrgGraph } }),
+      analysis: () => analysis,
       commentsForPr: () => pins,
       updateComment: vi.fn(),
       insertComment: vi.fn((input: object) => input),
     };
     const bb = { realtime: { publish: vi.fn() }, agents: { registerTool: vi.fn() }, events: { on: vi.fn() } };
     const comments = createComments({ bb, store, github: {}, models: {} } as unknown as Parameters<typeof createComments>[0]);
-    return { comments, store };
+    return { comments, store, bb };
   }
+
+  // A gone analysis, one with no result yet, and one from before PR Lens that has no diagrams.
+  const noDiagrams = [null, { ...current, result: null }, { ...current, result: { summary: "Old." } }];
+
+  it("leaves pins alone when the analysis is gone or has no diagrams", () => {
+    noDiagrams.forEach((analysis) => {
+      const { comments, store, bb } = setup([pin("node-gone", "architecture-overview", "payment-gateway")], analysis);
+      comments.reconcileDiagramPins("an_2");
+      expect(store.updateComment).not.toHaveBeenCalled();
+      expect(bb.realtime.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  it("will not pin a comment to an analysis that is gone or has no diagrams", () => {
+    noDiagrams.forEach((analysis) => {
+      const { comments, store } = setup([], analysis);
+      const add = () => comments.addDiagramComment({ ref, analysisId: "an_2", diagramId: "data-model", nodeId: "subscription", body: "Hm." });
+      expect(add).toThrow("That diagram node no longer exists.");
+      expect(store.insertComment).not.toHaveBeenCalled();
+    });
+  });
 
   it("marks pins on nodes and tables gone after a re-run outdated, and keeps the rest open", () => {
     const { comments, store } = setup([
@@ -191,5 +226,94 @@ describe("diagram comments", () => {
     expect(add("architecture-overview", "subscription")).toThrow("That diagram node no longer exists.");
     expect(add("nope", "billing-service")).toThrow("That diagram node no longer exists.");
     expect(store.insertComment).not.toHaveBeenCalled();
+  });
+});
+
+describe("AI tagging", () => {
+  const ref = { owner: "acme", repo: "web", number: 7 };
+  const stored = { id: "cm_1", source: "diff", ref, path: "a.ts", line: 3, nodeLabel: null, body: "Leaks memory.", tag: null as string | null };
+
+  function setup() {
+    const comment = { ...stored };
+    const handlers = new Map<string, (event: { thread: { id: string } }) => void>();
+    const tools: { parameters: { safeParse: (input: unknown) => { success: boolean } }; execute: (input: { tags: { commentId: string; tag: string }[] }, context: { threadId?: string }) => unknown }[] = [];
+    const store = {
+      comment: vi.fn((id: string) => (id === comment.id ? comment : null)),
+      updateComment: vi.fn((_id: string, patch: { tag: string }) => Object.assign(comment, patch)),
+    };
+    const bb = {
+      realtime: { publish: vi.fn() },
+      agents: { registerTool: vi.fn((tool) => tools.push(tool)) },
+      events: { on: vi.fn((name: string, handler: (event: { thread: { id: string } }) => void) => handlers.set(name, handler)) },
+      sdk: {
+        projects: { list: vi.fn(async () => [{ id: "personal", kind: "personal" }]) },
+        threads: { spawn: vi.fn(async () => ({ id: "worker" })), archive: vi.fn(async () => undefined), stop: vi.fn(async () => undefined) },
+      },
+    };
+    const models = { selected: vi.fn(async () => null) };
+    const comments = createComments({ bb, store, github: {}, models } as unknown as Parameters<typeof createComments>[0]);
+    const tool = tools[0]!;
+    const idle = (threadId: string) => handlers.get("thread.idle")!({ thread: { id: threadId } });
+    return { comments, bb, store, tool, idle, comment };
+  }
+
+  it("lets the worker tag only its own comment, then finishes when the worker goes idle", async () => {
+    const { comments, bb, tool, idle, comment } = setup();
+    const tagging = comments.autoTag("cm_1");
+    await vi.waitFor(() => expect(bb.sdk.threads.spawn).toHaveBeenCalled());
+
+    await expect(tool.execute({ tags: [{ commentId: "cm_1", tag: "bug" }] }, { threadId: "elsewhere" })).resolves.toMatchObject({ isError: true });
+    await expect(tool.execute({ tags: [{ commentId: "cm_1", tag: "bug" }] }, {})).resolves.toMatchObject({ isError: true });
+    expect(comment.tag).toBeNull();
+    await expect(
+      tool.execute({ tags: [{ commentId: "cm_other", tag: "nit" }, { commentId: "cm_1", tag: "bug" }] }, { threadId: "worker" }),
+    ).resolves.toBe("Tagged. End your turn now.");
+    idle("worker");
+
+    await expect(tagging).resolves.toBeUndefined();
+    expect(comment.tag).toBe("bug");
+    expect(bb.sdk.threads.archive).toHaveBeenCalledWith({ threadId: "worker" });
+    expect(bb.sdk.threads.stop).toHaveBeenCalledWith({ threadId: "worker" });
+  });
+
+  it("fails when the worker finishes without a tag", async () => {
+    const { comments, bb, idle } = setup();
+    const tagging = comments.autoTag("cm_1");
+    await vi.waitFor(() => expect(bb.sdk.threads.spawn).toHaveBeenCalled());
+    idle("unrelated");
+    idle("worker");
+    await expect(tagging).rejects.toThrow("AI tagging did not pick a tag.");
+  });
+
+  it("refuses to tag a comment that is gone", async () => {
+    const { comments, bb } = setup();
+    await expect(comments.autoTag("cm_gone")).rejects.toThrow("That comment no longer exists.");
+    expect(bb.sdk.threads.spawn).not.toHaveBeenCalled();
+  });
+
+  it("describes a diff comment by file and line to the worker", async () => {
+    const { comments, bb, idle } = setup();
+    const tagging = comments.autoTag("cm_1").catch(() => undefined);
+    await vi.waitFor(() => expect(bb.sdk.threads.spawn).toHaveBeenCalled());
+    idle("worker");
+    await tagging;
+    const prompt = (bb.sdk.threads.spawn.mock.calls[0] as unknown as [{ prompt: string }])[0].prompt;
+    expect(prompt).toContain('"where":"a.ts:3"');
+    expect(prompt).toContain('"body":"Leaks memory."');
+  });
+
+  it("fails when the comment is deleted while the worker tags it", async () => {
+    const { comments, bb, store, idle } = setup();
+    const tagging = comments.autoTag("cm_1");
+    await vi.waitFor(() => expect(bb.sdk.threads.spawn).toHaveBeenCalled());
+    store.comment.mockReturnValue(null);
+    idle("worker");
+    await expect(tagging).rejects.toThrow("AI tagging did not pick a tag.");
+  });
+
+  it("asks the worker for at least one tag", () => {
+    const { tool } = setup();
+    expect(tool.parameters.safeParse({ tags: [] }).success).toBe(false);
+    expect(tool.parameters.safeParse({ tags: [{ commentId: "cm_1", tag: "bug" }] }).success).toBe(true);
   });
 });
