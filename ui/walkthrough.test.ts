@@ -102,6 +102,25 @@ describe("walkthrough targets", () => {
     expect(citeTarget(doc, tabs, { kind: "view", view: "send-pipeline-view" })).toEqual({ tab: "send-pipeline", focus: { kind: "all" } });
   });
 
+  it("shows a cited flow view as the flow it selects, or the first flow when it selects none", () => {
+    const pipeline = doc.flows[0]!;
+    const twoFlows = {
+      ...doc,
+      flows: [pipeline, { ...pipeline, id: "retry" }],
+      views: [
+        ...doc.views,
+        { id: "retry-view", title: "Retry", lens: "data-flow" as const, scope: { ...doc.views[1]!.scope, flows: ["retry"] }, defaultOpen: false, children: [] },
+        { id: "every-flow", title: "Every flow", lens: "data-flow" as const, scope: { kind: "all" as const }, defaultOpen: false, children: [] },
+      ],
+    };
+    const twoFlowTabs = diagramTabs(twoFlows);
+    expect(citeTarget(twoFlows, twoFlowTabs, { kind: "view", view: "retry-view" })).toEqual({ tab: "retry", focus: { kind: "all" } });
+    expect(citeTarget(twoFlows, twoFlowTabs, { kind: "view", view: "every-flow" })).toEqual({ tab: "send-pipeline", focus: { kind: "all" } });
+
+    const noFlows = { ...twoFlows, flows: [] };
+    expect(citeTarget(noFlows, diagramTabs(noFlows), { kind: "view", view: "every-flow" })).toBeNull();
+  });
+
   it("has no diagram target for file, node, unknown view or flow cites", () => {
     expect(citeTarget(doc, tabs, { kind: "file", path: "a.ts" })).toBeNull();
     expect(citeTarget(doc, tabs, { kind: "node", node: "postmark" })).toBeNull();
@@ -129,7 +148,7 @@ describe("node cite tab", () => {
     expect(nodeTab(billingOrgGraph, billingTabs, billingTabs[0]!.id, "invoice")).toBe(dataModel);
   });
 
-  it("is null when no tab draws it", () => {
-    expect(nodeTab(doc, tabs, "overview", "nope")).toBeNull();
+  it("is undefined when no tab draws it", () => {
+    expect(nodeTab(doc, tabs, "overview", "nope")).toBeUndefined();
   });
 });

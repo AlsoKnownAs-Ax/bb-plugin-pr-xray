@@ -103,15 +103,15 @@ function scopeFocus(scope: View["scope"]): Focus {
   return selection({ lanes: scope.lanes, nodes: scope.nodes, edges: scope.edges, tables: scope.tables });
 }
 
-/** The tab to select a cited node or table on: the current tab if it draws it, else the first that does; null if none. */
-export function nodeTab(doc: GraphDoc, tabs: DiagramTab[], current: string, id: string): string | null {
+/** The tab to select a cited node or table on: the current tab if it draws it, else the first that does; undefined if none. */
+export function nodeTab(doc: GraphDoc, tabs: DiagramTab[], current: string, id: string): string | undefined {
   const draws = (tab: DiagramTab) => commentTargets(doc, tab).has(id);
   const here = tabs.find((tab) => tab.id === current);
   if (here && draws(here)) {
     return here.id;
   }
 
-  return tabs.find(draws)?.id ?? null;
+  return tabs.find(draws)?.id;
 }
 
 function findView(views: View[], id: string): View | undefined {
@@ -130,7 +130,7 @@ function findView(views: View[], id: string): View | undefined {
 }
 
 /** The boxes of the focused elements on a render; none for "all" or when none is drawn there. `flow` is the flow the render draws. */
-export function focusBoxes(focus: Focus, atlas: RenderAtlas, flow?: string): Box[] {
+export function focusBoxes(focus: Focus, atlas: RenderAtlas, flow = ""): Box[] {
   if (focus.kind === "all") {
     return [];
   }
@@ -140,8 +140,8 @@ export function focusBoxes(focus: Focus, atlas: RenderAtlas, flow?: string): Box
     ...focus.nodes.map((id) => atlas.nodes[id]),
     ...focus.edges.map((id) => atlas.edges[id]),
     ...focus.tables.map((id) => atlas.tables[id]),
-    // No flow, no flow steps: no messages are keyed under "".
-    ...focus.messages.map((id) => atlas.messages[flow ?? ""]?.[id]),
+    // No flow, no flow steps: no messages are keyed under "" (not a valid id).
+    ...focus.messages.map((id) => atlas.messages[flow]?.[id]),
   ].filter((found) => found !== undefined);
 }
 
