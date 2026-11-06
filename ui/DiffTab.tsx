@@ -23,7 +23,7 @@ import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
 import { FixCommentsButton } from "./FixCommentsButton";
 import { FileTree } from "./FileTree";
-import { groupsOfPath, viewedPaths } from "./file-tree";
+import { groupsOfPath, topmostPath, viewedPaths } from "./file-tree";
 import { prRefKey } from "../shared/pr-ref";
 import { canKeepDraft, draftInDiff, filesNotShown, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
@@ -244,10 +244,16 @@ export function DiffTab({
   useEffect(() => {
     const root = scrollRef.current;
     if (!root) return;
+    // Each callback only reports sections that changed, so remember every one still on screen.
+    const onScreen = new Set<Element>();
     const observer = new IntersectionObserver(
       (entries) => {
-        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        const path = visible?.target.getAttribute("data-file-path");
+        for (const entry of entries) {
+          if (entry.isIntersecting) onScreen.add(entry.target);
+          else onScreen.delete(entry.target);
+        }
+        // Measure now: tops recorded in earlier callbacks are stale after scrolling.
+        const path = topmostPath([...onScreen].map((element) => ({ path: element.getAttribute("data-file-path") ?? "", top: element.getBoundingClientRect().top })));
         if (path) setActivePath(path);
       },
       { root, rootMargin: "0px 0px -70% 0px" },

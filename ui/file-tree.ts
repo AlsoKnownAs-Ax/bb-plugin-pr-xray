@@ -43,7 +43,11 @@ export function groupsOfPath(pathsByGroup: string[][]): Map<string, number[]> {
   return map;
 }
 
-export const fileTooltip = (file: PrFile) =>
+/** The current file: of the file sections on screen, the one nearest the top. */
+export const topmostPath = (sections: { path: string; top: number }[]) =>
+  sections.reduce<{ path: string; top: number } | undefined>((best, section) => (best && best.top <= section.top ? best : section), undefined)?.path;
+
+export const fileTooltip =(file: PrFile) =>
   (file.previousPath ? `${file.previousPath} → ${file.path}` : file.path) + (isPatchless(file) ? "\nNot shown in this diff. Open on GitHub." : "");
 
 /** Binary or oversized: GitHub gave no patch, so the file has no hunks to jump to. */

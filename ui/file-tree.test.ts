@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Hunk, PrFile } from "../shared/schema";
-import { buildFileTree, fileStatus, fileTooltip, groupsOfPath, notListedLabel, viewedPaths, type FileTreeNode } from "./file-tree";
+import { buildFileTree, fileStatus, fileTooltip, groupsOfPath, notListedLabel, topmostPath, viewedPaths, type FileTreeNode } from "./file-tree";
 
 const file = (path: string, extra: Partial<PrFile> = {}): PrFile => ({
   index: 0,
@@ -92,5 +92,15 @@ describe("viewedPaths", () => {
 
   it("never marks a file without hunks viewed", () => {
     expect(viewedPaths(files, hunks, new Set()).has("logo.png")).toBe(false);
+  });
+});
+
+describe("topmostPath", () => {
+  it("picks the on-screen file section nearest the top, whatever order they arrive in", () => {
+    expect(topmostPath([{ path: "b.ts", top: 300 }, { path: "a.ts", top: -40 }, { path: "c.ts", top: 120 }])).toBe("a.ts");
+  });
+
+  it("has no current file when no section is on screen", () => {
+    expect(topmostPath([])).toBeUndefined();
   });
 });
