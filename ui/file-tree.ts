@@ -34,6 +34,15 @@ const STATUS: Record<string, { letter: string; label: string }> = {
 /** GitHub's file status as one letter; anything else (modified, changed) reads as M. */
 export const fileStatus = (file: PrFile) => STATUS[file.status] ?? { letter: "M", label: "Modified" };
 
+/** For each path, the 1-based reading-path numbers of the groups it appears in, given each group's paths in order. */
+export function groupsOfPath(pathsByGroup: string[][]): Map<string, number[]> {
+  const map = new Map<string, number[]>();
+  pathsByGroup.forEach((paths, index) => {
+    for (const path of paths) map.set(path, [...(map.get(path) ?? []), index + 1]);
+  });
+  return map;
+}
+
 export const fileTooltip = (file: PrFile) => (file.previousPath ? `${file.previousPath} → ${file.path}` : file.path);
 
 const dir = (name: string, path: string): FileTreeDir => ({ kind: "dir", name, path, children: [], additions: 0, deletions: 0 });

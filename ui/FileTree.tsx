@@ -11,7 +11,7 @@ const FOCUS = "focus-visible:outline-none focus-visible:ring-1 focus-visible:rin
 const STATUS_CLASS: Record<string, string> = { A: "text-success", D: "text-destructive" };
 
 /** The File tree: the PR's changed files by directory. Clicking a file opens it in the diff. */
-export function FileTree({ files, onOpen }: { files: PrFile[]; onOpen: (path: string) => void }) {
+export function FileTree({ files, groupsOfPath, onOpen }: { files: PrFile[]; groupsOfPath: Map<string, number[]>; onOpen: OnOpen }) {
   const tree = useMemo(() => buildFileTree(files), [files]);
   // Folders start expanded, so track the collapsed ones.
   const [closed, setClosed] = useState<Set<string>>(new Set());
@@ -23,16 +23,18 @@ export function FileTree({ files, onOpen }: { files: PrFile[]; onOpen: (path: st
     });
   return (
     <div className="font-mono">
-      <Rows nodes={tree} closed={closed} onToggle={toggle} onOpen={onOpen} />
+      <Rows nodes={tree} closed={closed} onToggle={toggle} groupsOfPath={groupsOfPath} onOpen={onOpen} />
     </div>
   );
 }
 
-type RowsProps = { closed: Set<string>; onToggle: (path: string) => void; onOpen: (path: string) => void };
+/** `groupNumber` is the 1-based reading-path position to jump to; without it, the file's first appearance. */
+type OnOpen = (path: string, groupNumber?: number) => void;
+type RowsProps = { closed: Set<string>; onToggle: (path: string) => void; groupsOfPath: Map<string, number[]>; onOpen: OnOpen };
 
 function Rows({ nodes, ...props }: RowsProps & { nodes: FileTreeNode[] }) {
   return nodes.map((node) =>
-    node.kind === "dir" ? <DirRow key={`d:${node.path}`} node={node} {...props} /> : <FileRow key={node.file.path} node={node} onOpen={props.onOpen} />,
+    node.kind === "dir" ? <DirRow key={`d:${node.path}`} node={node} {...props} /> : <FileRow key={node.file.path} node={node} groups={props.groupsOfPath.get(node.file.path) ?? []} onOpen={props.onOpen} />,
   );
 }
 
@@ -57,17 +59,34 @@ function DirRow({ node, ...props }: RowsProps & { node: FileTreeDir }) {
   );
 }
 
-function FileRow({ node, onOpen }: { node: FileTreeFile; onOpen: (path: string) => void }) {
+function FileRow({ node, groups, onOpen }: { node: FileTreeFile; groups: number[]; onOpen: OnOpen }) {
   const { file } = node;
   const status = fileStatus(file);
+  // A div, not a button, so the group chips can be buttons of their own.
   return (
-    <button type="button" title={fileTooltip(file)} onClick={() => onOpen(file.path)} className={cn(ROW, "pl-1.5", FOCUS)}>
-      <span className="min-w-0 flex-1 truncate">{node.name}</span>
+    <div className={cn(ROW, "pl-1.5")}>
+      <button type="button" title={fileTooltip(file)} onClick={() => onOpen(file.path)} className={cn("min-w-0 flex-1 truncate rounded-sm text-left", FOCUS)}>
+        {node.name}
+      </button>
+      {groups.length > 1
+        ? groups.map((n) => (
+            <button
+              key={n}
+              type="button"
+              title={`Jump to group ${n}`}
+              aria-label={`Jump to ${file.path} in group ${n}`}
+              onClick={() => onOpen(file.path, n)}
+              className={cn("h-4 shrink-0 rounded-full border border-border px-1.5 text-[10px] leading-none tabular-nums text-muted-foreground hover:bg-state-hover hover:text-foreground", CONTROL_HOVER_TRANSITION, FOCUS)}
+            >
+              {n}
+            </button>
+          ))
+        : null}
       <Counts additions={file.additions} deletions={file.deletions} />
       <span title={status.label} aria-label={status.label} className={cn("w-2.5 shrink-0 text-center text-[10px] font-semibold", STATUS_CLASS[status.letter] ?? "text-muted-foreground")}>
         {status.letter}
       </span>
-    </button>
+    </div>
   );
 }
 

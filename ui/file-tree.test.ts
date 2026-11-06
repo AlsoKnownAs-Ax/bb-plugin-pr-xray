@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrFile } from "../shared/schema";
-import { buildFileTree, fileStatus, fileTooltip, type FileTreeNode } from "./file-tree";
+import { buildFileTree, fileStatus, fileTooltip, groupsOfPath, type FileTreeNode } from "./file-tree";
 
 const file = (path: string, extra: Partial<PrFile> = {}): PrFile => ({
   index: 0,
@@ -55,5 +55,15 @@ describe("file tree", () => {
   it("shows a change status letter", () => {
     const letter = (status: string) => fileStatus(file("a.ts", { status })).letter;
     expect(["added", "modified", "removed", "renamed", "changed"].map(letter)).toEqual(["A", "M", "D", "R", "M"]);
+  });
+});
+
+describe("groups of a path", () => {
+  it("lists the reading-path numbers of every group a file appears in, in order", () => {
+    const map = groupsOfPath([["a.ts", "b.ts"], ["c.ts"], ["a.ts"], [], ["a.ts", "c.ts"]]);
+    expect(map.get("a.ts")).toEqual([1, 3, 5]);
+    expect(map.get("b.ts")).toEqual([1]);
+    expect(map.get("c.ts")).toEqual([2, 5]);
+    expect(map.get("missing.ts")).toBeUndefined();
   });
 });

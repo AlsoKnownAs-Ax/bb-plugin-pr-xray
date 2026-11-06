@@ -23,6 +23,7 @@ import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
 import { FixCommentsButton } from "./FixCommentsButton";
 import { FileTree } from "./FileTree";
+import { groupsOfPath } from "./file-tree";
 import { prRefKey } from "../shared/pr-ref";
 import { canKeepDraft, draftInDiff, filesNotShown, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
@@ -108,6 +109,8 @@ export function DiffTab({
     }
     return map;
   }, [files, groups, hunks]);
+
+  const groupNumbers = useMemo(() => groupsOfPath(groups.map((group) => groupPaths.get(group.id) ?? [])), [groupPaths, groups]);
 
   /** Group ids and fileKeys whose hunks are all viewed. */
   const viewed = useMemo(() => {
@@ -207,9 +210,9 @@ export function DiffTab({
   // shortcut: files without hunks (binary, oversized) have nowhere to jump, so they're left out until #19 gives them a row.
   const treeFiles = useMemo(() => pr.files.filter((file) => file.hunkIds.length > 0), [pr.files]);
 
-  /** Jumps to the file's first appearance in the reading path, opening it if viewed. */
-  const openFile = (path: string) => {
-    const group = groups.find((candidate) => groupPaths.get(candidate.id)?.includes(path));
+  /** Jumps to the file in reading-path group `groupNumber` (default: its first appearance), opening it if viewed. */
+  const openFile = (path: string, groupNumber?: number) => {
+    const group = groupNumber ? groups[groupNumber - 1] : groups.find((candidate) => groupPaths.get(candidate.id)?.includes(path));
     if (!group) return;
     setOpen(group.id, true);
     setOpen(fileKey(group.id, path), true);
@@ -379,7 +382,7 @@ export function DiffTab({
           ) : null}
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-          {sidebar === "files" ? <FileTree files={treeFiles} onOpen={openFile} /> : null}
+          {sidebar === "files" ? <FileTree files={treeFiles} groupsOfPath={groupNumbers} onOpen={openFile} /> : null}
           {sidebar === "path" && groups.map((group, index) => (
             <div
               key={group.id}
