@@ -125,21 +125,58 @@ const MAX_DIAGRAMS = 4;
 
 type Submission = Omit<AnalysisResult, "renders">;
 
-/** Validates what the analysis agent submits. `pr` is the snapshot it analysed, when still known. */
-export function checkAnalysis(candidate: unknown, pr: PrDetails | null): { ok: true; value: Submission } | { ok: false; problems: string[] } {
+type Checked = { ok: true; value: AnalysisResult } | { ok: false; problems: string[] };
+
+/** Validates what the analysis agent submits and draws its diagrams. `pr` is the snapshot it analysed, when still known. */
+export function checkAnalysis(candidate: unknown, pr: PrDetails | null): Checked {
   const parsed = analysisBaseSchema.safeParse(candidate);
-  const problems = parsed.success
-    ? []
-    : parsed.error.issues.map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`);
+  const baseProblems = issueProblems(parsed.error?.issues);
   const raw = (candidate as { graph?: unknown } | null)?.graph;
-  if (raw === undefined) return { ok: false, problems: [...problems, "graph: missing; submit a PR Lens graph document."] };
+  if (raw === undefined) {
+    return { ok: false, problems: [...baseProblems, "graph: missing; submit a PR Lens graph document."] };
+  }
+
   const graph = safeParseGraphDoc(raw);
-  if (!graph.ok) problems.push(...graph.error.issues.map((issue) => `graph${issue.path ? `.${issue.path}` : ""}: ${issue.message}`));
-  else problems.push(...graphProblems(graph.value));
-  if (!parsed.success || !graph.ok) return { ok: false, problems };
+  if (!graph.ok) {
+    return { ok: false, problems: [...baseProblems, ...graph.error.issues.map(graphIssueProblem)] };
+  }
+
+  if (!parsed.success) {
+    return { ok: false, problems: [...baseProblems, ...graphProblems(graph.value)] };
+  }
+
   const value = { ...parsed.data, graph: graph.value };
-  if (pr !== null) problems.push(...crossCheck(value, pr));
-  return problems.length > 0 ? { ok: false, problems } : { ok: true, value };
+  const problems = [...graphProblems(graph.value), ...crossCheck(value, pr)];
+  if (problems.length > 0) {
+    return { ok: false, problems };
+  }
+
+  return drawn(value);
+}
+
+function issueProblems(issues: z.core.$ZodIssue[] = []): string[] {
+  return issues.map((issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`);
+}
+
+function graphIssueProblem(issue: { path: string; message: string }): string {
+  if (!issue.path) {
+    return `graph: ${issue.message}`;
+  }
+
+  return `graph.${issue.path}: ${issue.message}`;
+}
+
+/** A checked submission with its renders, or the renderer's complaint as a problem. */
+function drawn(value: Submission): Checked {
+  try {
+    return { ok: true, value: { ...value, renders: renderDiagrams(value.graph) } };
+  } catch (error) {
+    if (!(error instanceof PrLensRenderError)) {
+      throw error;
+    }
+
+    return { ok: false, problems: [`graph: cannot be drawn: ${error.message}`] };
+  }
 }
 
 /** Our limits on top of the PR Lens schema. */
@@ -178,7 +215,11 @@ function stagedView(step: WalkthroughStep): string | undefined {
 }
 
 /** Problems a schema cannot express: hunk coverage and cross references. */
-function crossCheck(result: Submission, pr: PrDetails): string[] {
+function crossCheck(result: Submission, pr: PrDetails | null): string[] {
+  if (pr === null) {
+    return [];
+  }
+
   const problems: string[] = [];
   const known = new Set(pr.hunks.map((hunk) => hunk.id));
   const seen = new Map<string, string>();
@@ -338,23 +379,14 @@ export function createAnalysis(deps: {
       }
       const candidate = typeof result === "string" ? safeJson(result) : result;
       const checked = checkAnalysis(candidate, await snapshotFor(record.id));
-      let problems = checked.ok ? [] : checked.problems;
-      let renders: AnalysisResult["renders"] = {};
-      if (checked.ok) {
-        try {
-          renders = renderDiagrams(checked.value.graph);
-        } catch (error) {
-          if (!(error instanceof PrLensRenderError)) throw error;
-          problems = [`graph: cannot be drawn: ${error.message}`];
-        }
-      }
-      if (!checked.ok || problems.length > 0) {
+      if (!checked.ok) {
         return {
-          content: [{ type: "text", text: `Fix these problems and submit again:\n${problems.slice(0, 40).map((p) => `- ${p}`).join("\n")}` }],
+          content: [{ type: "text", text: `Fix these problems and submit again:\n${checked.problems.slice(0, 40).map((p) => `- ${p}`).join("\n")}` }],
           isError: true,
         };
       }
-      store.completeAnalysis(record.id, { ...checked.value, renders });
+
+      store.completeAnalysis(record.id, checked.value);
       snapshots.delete(record.id);
       deps.onDiagramNodesChanged(record.id);
       publish(record.ref);

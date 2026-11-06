@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrDetails } from "../shared/schema";
-import { checkAnalysis } from "./analysis";
-import { renderDiagrams } from "./render";
+import { annotatedDiff, checkAnalysis, findTicketUrl } from "./analysis";
 
 const pr = { hunks: [{ id: "h1" }] } as unknown as PrDetails;
 
@@ -81,6 +80,12 @@ describe("the analysis submit check", () => {
     expect(problemsOf(submission({ graph: doc }))).toContain("draws 5 diagrams");
   });
 
+  it("accepts exactly 4 diagrams", () => {
+    const doc = graph();
+    doc.flows.push(...["a", "b"].map((id) => ({ ...(doc.flows[0] as object), id })));
+    expect(checkAnalysis(submission({ graph: doc }), pr).ok).toBe(true);
+  });
+
   it("rejects a step staged on a view that has no tab", () => {
     const doc = graph();
     doc.views.push({ id: "drill", title: "Drill-down", lens: "architecture" });
@@ -105,10 +110,10 @@ describe("the analysis submit check", () => {
     expect(problemsOf(old)).toContain("graph: missing; submit a PR Lens graph document.");
   });
 
-  it("lets the server draw every tab in light and dark", () => {
+  it("draws every tab in light and dark", () => {
     const checked = checkAnalysis(submission(), pr);
     if (!checked.ok) throw new Error(checked.problems.join("\n"));
-    const renders = renderDiagrams(checked.value.graph);
+    const renders = checked.value.renders;
     expect(Object.keys(renders)).toEqual(["overview", "lookup"]);
     expect(renders.overview!.light.svg).toMatch(/^<svg/);
     expect(renders.overview!.dark.background).not.toBe(renders.overview!.light.background);
@@ -119,5 +124,74 @@ describe("the analysis submit check", () => {
     expect(problemsOf(submission({ groups: [{ id: "g1", title: "Cache", why: "Faster.", kind: "core", hunkIds: ["h9"] }]}))).toContain(
       "Group g1 references unknown hunk h9.",
     );
+  });
+
+  it("returns a graph the renderer cannot draw as a problem", () => {
+    const doc = graph();
+    doc.lanes.push({ id: "empty", label: "Empty" });
+    doc.views[0] = { id: "overview", title: "Architecture", lens: "architecture", scope: { kind: "selection", lanes: ["empty"] } };
+    expect(problemsOf(submission({ graph: doc }))).toMatch(/^graph: cannot be drawn: /);
+  });
+
+  it("names the root when the submission is not an object", () => {
+    expect(problemsOf("not json")).toMatch(/^\(root\): /m);
+    expect(problemsOf(null)).toContain("graph: missing");
+    expect(problemsOf({ ...submission(), graph: 42 })).toMatch(/^graph: /m);
+  });
+
+  it("reports a bad base field alongside the walkthrough problems of a good graph", () => {
+    const { walkthrough: _walkthrough, ...doc } = graph();
+    const problems = problemsOf(submission({ summary: undefined, graph: doc }));
+    expect(problems).toMatch(/^summary: /m);
+    expect(problems).toContain("graph.walkthrough: missing");
+  });
+
+  it("accepts a step with no stage", () => {
+    const doc = graph();
+    delete (doc.walkthrough.steps[1] as { stage?: unknown }).stage;
+    expect(checkAnalysis(submission({ graph: doc }), pr).ok).toBe(true);
+  });
+
+  it("names a single hunk that is in no group", () => {
+    const twoHunks = { hunks: [{ id: "h1" }, { id: "h2" }] } as unknown as PrDetails;
+    const checked = checkAnalysis(submission(), twoHunks);
+    expect(checked.ok ? [] : checked.problems).toContain("These hunks are in no group: h2.");
+  });
+
+  it("skips the hunk checks when there is no PR snapshot", () => {
+    expect(checkAnalysis(submission({ groups: [{ id: "g1", title: "Cache", why: "Faster.", kind: "core", hunkIds: ["h9"] }] }), null).ok).toBe(true);
+  });
+});
+
+describe("the ticket link", () => {
+  it("is the first match of the pattern, without trailing punctuation", () => {
+    const pattern = String.raw`https://www\.notion\.so/\S+`;
+    expect(findTicketUrl("See https://www.notion.so/acme/Cache-123). Thanks", pattern)).toBe("https://www.notion.so/acme/Cache-123");
+    expect(findTicketUrl("No link here.", pattern)).toBeNull();
+  });
+
+  it("falls back to any Notion link when the pattern is not a valid regex", () => {
+    expect(findTicketUrl("Ticket: https://app.notion.com/p/abc]", "(")).toBe("https://app.notion.com/p/abc");
+  });
+});
+
+describe("the annotated diff", () => {
+  it("lists each file with its hunks, and says when a file has no patch", () => {
+    const withFiles = {
+      files: [
+        { path: "a.ts", previousPath: "old.ts", status: "renamed", additions: 1, deletions: 0, hasPatch: true, hunkIds: ["h1"] },
+        { path: "logo.png", status: "added", additions: 0, deletions: 0, hasPatch: false, hunkIds: [] },
+      ],
+      hunks: [{ id: "h1", patch: "+x" }],
+    } as unknown as PrDetails;
+    expect(annotatedDiff(withFiles).split("\n")).toEqual([
+      "",
+      "=== FILE a.ts (renamed from old.ts) [renamed, +1/-0]",
+      "--- HUNK h1",
+      "+x",
+      "",
+      "=== FILE logo.png [added, +0/-0]",
+      "(no textual patch: binary or too large)",
+    ]);
   });
 });
