@@ -1,5 +1,5 @@
 // The File tree: a PR's changed files arranged by directory, like GitHub's.
-import type { PrFile } from "../shared/schema";
+import type { Hunk, PrFile } from "../shared/schema";
 
 /** `path` is the deepest folder of a compacted row, so it stays a stable key. */
 export type FileTreeDir = { kind: "dir"; name: string; path: string; children: FileTreeNode[]; additions: number; deletions: number };
@@ -52,3 +52,11 @@ function finish(node: FileTreeDir): FileTreeDir {
     deletions: counts.reduce((sum, child) => sum + child.deletions, 0),
   };
 }
+
+/** Paths of files whose every hunk is viewed, across all groups. A file without hunks is never viewed. */
+export const viewedPaths = (files: PrFile[], hunks: ReadonlyMap<string, Hunk>, viewedHunks: ReadonlySet<string>) =>
+  new Set(
+    files
+      .filter((file) => file.hunkIds.length > 0 && file.hunkIds.every((id) => viewedHunks.has(hunks.get(id)?.fingerprint ?? "")))
+      .map((file) => file.path),
+  );

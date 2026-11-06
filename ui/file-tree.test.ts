@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { PrFile } from "../shared/schema";
+import type { Hunk, PrFile } from "../shared/schema";
 import { buildFileTree, fileStatus, fileTooltip, type FileTreeNode } from "./file-tree";
+import { viewedPaths } from "./file-tree";
 
 const file = (path: string, extra: Partial<PrFile> = {}): PrFile => ({
   index: 0,
@@ -55,5 +56,23 @@ describe("file tree", () => {
   it("shows a change status letter", () => {
     const letter = (status: string) => fileStatus(file("a.ts", { status })).letter;
     expect(["added", "modified", "removed", "renamed", "changed"].map(letter)).toEqual(["A", "M", "D", "R", "M"]);
+  });
+});
+
+describe("viewedPaths", () => {
+  const hunk = (id: string): Hunk => ({ id, fingerprint: `fp-${id}`, fileIndex: 0, header: "", patch: "", additions: 1, deletions: 0 });
+  const hunks = new Map(["a1", "a2", "b1"].map((id) => [id, hunk(id)]));
+  const files = [file("a.ts", { hunkIds: ["a1", "a2"] }), file("b.ts", { hunkIds: ["b1"] }), file("logo.png", { hunkIds: [] })];
+
+  it("marks a file viewed only when every one of its hunks is viewed", () => {
+    expect([...viewedPaths(files, hunks, new Set(["fp-a1", "fp-a2", "fp-b1"]))]).toEqual(["a.ts", "b.ts"]);
+  });
+
+  it("leaves a partially viewed file unviewed", () => {
+    expect([...viewedPaths(files, hunks, new Set(["fp-a1", "fp-b1"]))]).toEqual(["b.ts"]);
+  });
+
+  it("never marks a file without hunks viewed", () => {
+    expect(viewedPaths(files, hunks, new Set()).has("logo.png")).toBe(false);
   });
 });
