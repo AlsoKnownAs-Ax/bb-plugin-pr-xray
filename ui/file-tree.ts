@@ -25,17 +25,18 @@ export function buildFileTree(files: PrFile[]): FileTreeNode[] {
   return finish(root).children;
 }
 
-const STATUS: Record<string, { letter: string; label: string }> = {
-  added: { letter: "A", label: "Added" },
-  removed: { letter: "D", label: "Deleted" },
-  renamed: { letter: "R", label: "Renamed" },
-  copied: { letter: "C", label: "Copied" },
+// Only added/deleted get a color; the rest stay quiet.
+const STATUS: Record<string, { letter: string; label: string; className: string }> = {
+  added: { letter: "A", label: "Added", className: "text-success" },
+  removed: { letter: "D", label: "Deleted", className: "text-destructive" },
+  renamed: { letter: "R", label: "Renamed", className: "text-muted-foreground" },
+  copied: { letter: "C", label: "Copied", className: "text-muted-foreground" },
 };
 /** GitHub's file status as one letter; anything else (modified, changed) reads as M. */
-export const fileStatus = (file: PrFile) => STATUS[file.status] ?? { letter: "M", label: "Modified" };
+export const fileStatus = (file: PrFile) => STATUS[file.status] ?? { letter: "M", label: "Modified", className: "text-muted-foreground" };
 
 /** For each path, the 1-based reading-path numbers of the groups it appears in, given each group's paths in order. */
-export function groupsOfPath(pathsByGroup: string[][]): Map<string, number[]> {
+export function buildGroupsOfPath(pathsByGroup: string[][]): Map<string, number[]> {
   const map = new Map<string, number[]>();
   pathsByGroup.forEach((paths, index) => {
     for (const path of paths) map.set(path, [...(map.get(path) ?? []), index + 1]);

@@ -24,7 +24,7 @@ import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
 import { FixCommentsButton } from "./FixCommentsButton";
 import { FileTree } from "./FileTree";
-import { groupsOfPath, topmostPath, viewedPaths } from "./file-tree";
+import { buildGroupsOfPath, topmostPath, viewedPaths } from "./file-tree";
 import { prRefKey } from "../shared/pr-ref";
 import { canKeepDraft, draftInDiff, filesNotShown, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
@@ -113,7 +113,7 @@ export function DiffTab({
     return map;
   }, [files, groups, hunks]);
 
-  const groupNumbers = useMemo(() => groupsOfPath(groups.map((group) => groupPaths.get(group.id) ?? [])), [groupPaths, groups]);
+  const groupsOfPath = useMemo(() => buildGroupsOfPath(groups.map((group) => groupPaths.get(group.id) ?? [])), [groupPaths, groups]);
 
   /** Group ids and fileKeys whose hunks are all viewed. */
   const viewed = useMemo(() => {
@@ -415,7 +415,7 @@ export function DiffTab({
           {sidebar === "files" ? (
             <FileTree
               files={pr.files}
-              groupsOfPath={groupNumbers}
+              groupsOfPath={groupsOfPath}
               onOpen={openFile}
               prUrl={pr.url}
               unlisted={filesNotShown(pr).unlisted}
