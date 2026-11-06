@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in PR X-ray doesn't work as it should.
+labels: [bug, needs-triage]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a PR in PR X-ray
+        2. ...
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+  - type: input
+    id: pr-link
+    attributes:
+      label: PR link
+      description: Optional. Only add it if the PR is public, because this tracker is public.
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+  - type: input
+    id: os
+    attributes:
+      label: OS
+  - type: input
+    id: bb-version
+    attributes:
+      label: bb version
+      description: Find it in bb's About or Settings.

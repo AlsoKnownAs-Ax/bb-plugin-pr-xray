@@ -16,6 +16,7 @@ import { DiffTab, type ViewMode } from "./DiffTab";
 import { displayGroups } from "./diff-utils";
 import { viewedRows } from "./hold-commit";
 import { ExplainTab } from "./ExplainTab";
+import { ReportBugButton } from "./ReportBug";
 import { uiStore } from "./store";
 import { errorMessage, useReview } from "./useReview";
 
@@ -248,6 +249,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
           <Icon name={focus ? "Minimize2" : "Maximize2"} />
           {focus ? "Exit focus" : "Focus"}
         </Button>
+        <ReportBugButton />
       </header>
 
       {running && current ? (

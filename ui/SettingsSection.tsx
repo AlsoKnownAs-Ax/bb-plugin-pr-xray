@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { rpcContract } from "../shared/contract";
 import type { ModelPurpose, ModelSelection } from "../shared/schema";
+import { ReportBugFooter } from "./ReportBug";
 import { errorMessage } from "./useReview";
 
 interface State {
@@ -65,7 +66,17 @@ function ModelSetting(props: {
   );
 }
 
+/** The footer sits outside the form so the bug link stays reachable while settings load or fail to load. */
 export function SettingsSection() {
+  return (
+    <div className="space-y-6">
+      <SettingsForm />
+      <ReportBugFooter />
+    </div>
+  );
+}
+
+function SettingsForm() {
   const rpc = useRpc<typeof rpcContract>();
   const [state, setState] = useState<State | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +102,7 @@ export function SettingsSection() {
   if (!state) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
   return (
-    <div className="space-y-6">
+    <>
       <div className="space-y-1">
         <div className="text-sm font-medium">GitHub</div>
         {state.identity ? (
@@ -119,6 +130,6 @@ export function SettingsSection() {
         pickerSeed={state.pickerSeed}
         onChange={(selection) => void save("tagging", selection)}
       />
-    </div>
+    </>
   );
 }

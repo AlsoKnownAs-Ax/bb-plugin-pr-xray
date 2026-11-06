@@ -6,7 +6,7 @@ import type { PrFile } from "../shared/schema";
 import { buildFileTree, fileStatus, fileTooltip, isPatchless, notListedLabel, type FileTreeDir, type FileTreeFile, type FileTreeNode } from "./file-tree";
 
 const ROW = cn("flex h-6 w-full min-w-0 items-center gap-1.5 rounded-md pr-1.5 text-left text-xs hover:bg-state-hover", CONTROL_HOVER_TRANSITION);
-const FOCUS = "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+export const FOCUS = "focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 /** The File tree: the PR's changed files by directory. Clicking a file opens it in the diff; patchless ones open GitHub. */
 export function FileTree({
