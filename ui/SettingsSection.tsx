@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import type { rpcContract } from "../shared/contract";
 import type { ModelPurpose, ModelSelection } from "../shared/schema";
 import { errorMessage } from "./useReview";
+import { PrototypeSwitcher, ReportBugSettings } from "./ReportBugPrototype";
 
 interface State {
   identity: { login: string; source: "token" | "gh" } | null;
@@ -119,6 +120,8 @@ export function SettingsSection() {
         pickerSeed={state.pickerSeed}
         onChange={(selection) => void save("tagging", selection)}
       />
+      <ReportBugSettings />
+      <PrototypeSwitcher />
     </div>
   );
 }

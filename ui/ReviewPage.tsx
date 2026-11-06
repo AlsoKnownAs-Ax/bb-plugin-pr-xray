@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PrototypeSwitcher, ReportBugHeaderButton } from "./ReportBugPrototype";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
 import { usePortalScopeProps } from "@/lib/portal-scope";
@@ -244,11 +245,13 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             Agent run
           </Button>
         ) : null}
+        <ReportBugHeaderButton />
         <Button size="sm" variant="ghost" onClick={() => setFocus(!focus)} aria-keyshortcuts={focus ? "f Escape" : "f"}>
           <Icon name={focus ? "Minimize2" : "Maximize2"} />
           {focus ? "Exit focus" : "Focus"}
         </Button>
       </header>
+      <PrototypeSwitcher />
 
       {running && current ? (
         <AnalysisProgress
