@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui/icon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { version } from "../package.json";
-import { bugReportUrl, osName } from "./bug-report";
+import { bugReportUrl, osName, repoUrl } from "./bug-report";
 
 /** The preview popover. `children` gets the open state and must render a `PopoverTrigger`. */
 export function ReportBugPopover({ align, children }: { align: "start" | "end"; children: (open: boolean) => ReactNode }) {
@@ -63,5 +63,34 @@ export function ReportBugButton() {
         </TooltipProvider>
       )}
     </ReportBugPopover>
+  );
+}
+
+const footerLink =
+  "rounded-sm underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+
+/** Settings footer: version, "Report a bug" (same preview, start-aligned) and the repo link. */
+export function ReportBugFooter() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
+      <span>
+        PR X-ray <span className="tabular-nums">{version}</span>
+      </span>
+      <span aria-hidden="true">·</span>
+      <ReportBugPopover align="start">
+        {() => (
+          <PopoverTrigger asChild>
+            <button type="button" className={`flex cursor-pointer items-center gap-1 ${footerLink}`}>
+              <Icon name="Bug" className="size-3" />
+              Report a bug
+            </button>
+          </PopoverTrigger>
+        )}
+      </ReportBugPopover>
+      <span aria-hidden="true">·</span>
+      <a href={repoUrl} target="_blank" rel="noreferrer" className={footerLink}>
+        GitHub
+      </a>
+    </div>
   );
 }

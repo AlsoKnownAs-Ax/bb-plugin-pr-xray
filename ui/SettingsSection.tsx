@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import type { rpcContract } from "../shared/contract";
 import type { ModelPurpose, ModelSelection } from "../shared/schema";
+import { ReportBugFooter } from "./ReportBugPopover";
 import { errorMessage } from "./useReview";
 
 interface State {
@@ -119,6 +120,7 @@ export function SettingsSection() {
         pickerSeed={state.pickerSeed}
         onChange={(selection) => void save("tagging", selection)}
       />
+      <ReportBugFooter />
     </div>
   );
 }

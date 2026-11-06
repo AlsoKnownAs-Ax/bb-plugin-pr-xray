@@ -8,7 +8,9 @@ export function osName(userAgent: string): OsName {
   return "Unknown";
 }
 
+export const repoUrl = "https://github.com/AlsoKnownAs-Ax/bb-plugin-pr-xray";
+
 export function bugReportUrl(version: string, os: OsName): string {
   const params = new URLSearchParams({ template: "bug_report.yml", version, os });
-  return `https://github.com/AlsoKnownAs-Ax/bb-plugin-pr-xray/issues/new?${params}`;
+  return `${repoUrl}/issues/new?${params}`;
 }
