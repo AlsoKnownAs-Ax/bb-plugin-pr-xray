@@ -290,6 +290,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
           />
         ) : analysis?.result ? (
           <ExplainTab
+            key={analysis.id}
             data={data}
             analysis={analysis}
             rpc={rpc}
