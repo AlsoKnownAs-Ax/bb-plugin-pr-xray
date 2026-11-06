@@ -59,7 +59,7 @@ export function commentTargets(doc: GraphDoc, tab: DiagramTab): Map<string, stri
 
   if (tab.lens === "data-flow") {
     const flow = doc.flows.find((candidate) => candidate.id === tab.flow);
-    return new Map(flow?.participants.map((participant) => [participant.node, nodes.get(participant.node) ?? participant.node]));
+    return new Map(flow?.participants.map((participant) => [participant.node, participant.label ?? nodes.get(participant.node) ?? participant.node]));
   }
 
   return nodes;

@@ -38,12 +38,26 @@ describe("comment targets", () => {
     expect([...commentTargets(postmarkRefactorGraph, flow).keys()]).toEqual(["queue-route", "broadcast-queue", "send-broadcast-bulk", "postmark"]);
   });
 
-  it("label a flow participant with its node's label, or its id when the node is missing", () => {
+  it("label an unlabelled flow participant with its node's label, or its id when the node is missing", () => {
     const flow = diagramTab(postmarkRefactorGraph, "send-pipeline")!;
+    const unlabelled = {
+      ...postmarkRefactorGraph,
+      flows: postmarkRefactorGraph.flows.map((candidate) => ({ ...candidate, participants: candidate.participants.map(({ label: _label, ...participant }) => participant) })),
+    };
     const postmark = postmarkRefactorGraph.nodes.find((node) => node.id === "postmark")!;
-    expect(commentTargets(postmarkRefactorGraph, flow).get("postmark")).toBe(postmark.label);
-    const withoutPostmark = { ...postmarkRefactorGraph, nodes: postmarkRefactorGraph.nodes.filter((node) => node !== postmark) };
+    expect(commentTargets(unlabelled, flow).get("postmark")).toBe(postmark.label);
+    const withoutPostmark = { ...unlabelled, nodes: postmarkRefactorGraph.nodes.filter((node) => node !== postmark) };
     expect(commentTargets(withoutPostmark, flow).get("postmark")).toBe("postmark");
+  });
+
+  it("label a flow participant with its own label when it has one, as the card shows", () => {
+    const flow = diagramTab(postmarkRefactorGraph, "send-pipeline")!;
+    const flows = postmarkRefactorGraph.flows.map((candidate) =>
+      candidate.id === "send-pipeline"
+        ? { ...candidate, participants: candidate.participants.map((participant) => (participant.node === "postmark" ? { ...participant, label: "Mail API" } : participant)) }
+        : candidate,
+    );
+    expect(commentTargets({ ...postmarkRefactorGraph, flows }, flow).get("postmark")).toBe("Mail API");
   });
 
   it("are empty on a tab whose flow or data model the document no longer has", () => {
