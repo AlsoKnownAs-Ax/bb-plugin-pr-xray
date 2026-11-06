@@ -19,15 +19,3 @@ _Avoid_: Read, seen, reviewed
 **File tree**:
 The PR's changed files arranged by directory, showing where the change lands in the repo regardless of the reading path.
 _Avoid_: File list, file explorer, files panel
-
-**Diagram**:
-A picture of the PR's change, seen through one lens, that the reviewer can pin design comments to.
-_Avoid_: Chart, graph, canvas
-
-**Lens**:
-The angle a diagram takes on the change: architecture (which parts were added, changed or removed, lane by lane), data-flow (the calls a request makes, in order) or data-model (the tables touched and the keys between them).
-_Avoid_: Diagram kind, view type
-
-**Walkthrough**:
-A short guided tour of the change: a few steps, each showing one diagram, pointing at part of it, and saying in a line what changed there.
-_Avoid_: Narrative, tour, story
