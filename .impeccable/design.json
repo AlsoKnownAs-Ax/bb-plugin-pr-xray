@@ -26,12 +26,11 @@
       "body": { "displayName": "Body", "purpose": "Comments, walkthrough text, dialogs." },
       "body-small": { "displayName": "Body small", "purpose": "Meta lines, file rows, small buttons." },
       "label": { "displayName": "Label", "purpose": "Chips, legends, counts, keyboard hints." },
-      "overline": { "displayName": "Overline", "purpose": "Uppercase node kinds and severity words." },
+      "overline": { "displayName": "Overline", "purpose": "Uppercase node kind and change in the node panel, severity words." },
       "code": { "displayName": "Code", "purpose": "Paths, SHAs, file lists." }
     },
     "shadows": [
-      { "name": "hairline", "value": "var(--shadow-xs)", "purpose": "Comment cards, diagram nodes and toolbar: objects on the table." },
-      { "name": "node-hover", "value": "var(--shadow-md)", "purpose": "Diagram node on hover." },
+      { "name": "hairline", "value": "var(--shadow-xs)", "purpose": "Comment cards and the diagram zoom toolbar: objects on the table." },
       { "name": "launcher", "value": "var(--shadow-lg)", "purpose": "Floating chat launcher button." },
       { "name": "floating-panel", "value": "var(--shadow-2xl)", "purpose": "Floating chat panel." }
     ],
@@ -102,11 +101,11 @@
       "css": ".ds-thread { max-width: 48rem; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow-xs); font: 400 0.8125rem var(--font-sans); color: var(--foreground); } .ds-thread-head { padding: 6px 12px; border-bottom: 1px solid var(--border); font: 400 0.75rem var(--font-mono); color: var(--foreground); } .ds-thread-body { padding: 8px 12px; }"
     },
     {
-      "name": "Diagram Node",
+      "name": "Diagram Pin Target",
       "kind": "custom",
-      "description": "Explain-tab diagram node tinted by change kind, with comment counter.",
-      "html": "<div class=\"ds-node\"><span class=\"ds-node-kind\">module</span><span class=\"ds-node-title\">worker-clone</span><span class=\"ds-node-count\">2</span></div>",
-      "css": ".ds-node { position: relative; display: inline-flex; flex-direction: column; padding: 8px 12px; border: 2px solid color-mix(in oklab, var(--warning) 70%, transparent); border-radius: var(--radius); background: color-mix(in oklab, var(--warning) 10%, transparent); box-shadow: var(--shadow-xs); transition: box-shadow 150ms; font-family: var(--font-sans); color: var(--foreground); } .ds-node:hover { box-shadow: var(--shadow-md); } .ds-node-kind { font-size: 10px; text-transform: uppercase; letter-spacing: 0.025em; color: var(--muted-foreground); } .ds-node-title { font-size: 0.8125rem; font-weight: 500; } .ds-node-count { position: absolute; top: -10px; right: -10px; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border: 2px solid var(--background); border-radius: 9999px 9999px 9999px 0; background: var(--warning); font-size: 11px; font-weight: 600; }"
+      "description": "Atlas overlay over a server-rendered PR Lens SVG: a click target on a node or table, primary outline when hovered or selected, with a comment pin (ink when any comment is open). The SVG itself, its palette and background come from the PR Lens renderer (ADR 0001).",
+      "html": "<div class=\"ds-target\"><span class=\"ds-pin\">2</span></div>",
+      "css": ".ds-target { position: relative; width: 160px; height: 48px; border-radius: var(--radius); outline: 2px solid var(--primary); outline-offset: 2px; } .ds-pin { position: absolute; top: -10px; right: -10px; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border: 2px solid var(--background); border-radius: 9999px 9999px 9999px 0; background: var(--foreground); color: var(--background); font: 600 11px var(--font-sans); box-shadow: var(--shadow); }"
     }
   ],
   "narrative": {

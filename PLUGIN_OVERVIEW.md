@@ -3,7 +3,7 @@ Understand a pull request before you review it. PR X-ray groups the diff by conc
 ## What you get
 
 - **Diff tab**: hunks grouped by concern and ordered as a reading path, with lockfiles and renames last. Viewed checkmarks, split or unified view, and GitHub-style inline comments, reviews, suggestions, replies and resolve.
-- **Explain tab**: a summary, a walkthrough, spots to look at closely, and interactive diagrams. Click a diagram node to leave a design comment, which stays in bb.
+- **Explain tab**: a summary, spots to look at closely, and interactive PR Lens diagrams with a walkthrough that zooms to each step. Click a node or table to leave a design comment, which stays in bb.
 - **Fix with agents**: fix one thread, your open review comments, all open comments, or redesign from your diagram comments. The redesign plans first and waits for your approval.
 - **Retro feed**: tag comments yourself or with AI, then export them with `bb pr-xray comments --json`.
 
