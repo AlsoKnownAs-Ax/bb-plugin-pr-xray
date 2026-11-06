@@ -163,7 +163,7 @@ export function ExplainTab({
               <h2 className="text-base font-semibold">Where to look closely</h2>
               <ul className="space-y-2">
                 {result.lookClosely.map((item, index) => (
-                  <li key={index} className={cn("rounded-lg border-l-4 border bg-card px-3 py-2", SEVERITY_STYLE[item.severity])}>
+                  <li key={index} className={cn("rounded-lg border bg-card px-3 py-2", SEVERITY_STYLE[item.severity])}>
                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                       {item.title}
                       <span className="text-[11px] font-normal uppercase">{item.severity}</span>
@@ -256,6 +256,8 @@ function CommentList({
 
 function DiagramCommentCard({ comment, rpc, onSelect }: { comment: StoredComment; rpc: Rpc; onSelect?: (comment: StoredComment) => void }) {
   const call = (promise: Promise<unknown>) => promise.catch((error: unknown) => toast.error(errorMessage(error)));
+  // Deleting can't be undone, so the first click asks.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   return (
     <div className="space-y-1.5 rounded-md border border-border bg-card p-2 text-sm">
       <div className="flex items-center gap-2">
@@ -275,9 +277,20 @@ function DiagramCommentCard({ comment, rpc, onSelect }: { comment: StoredComment
             Reopen
           </Button>
         )}
-        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => void call(rpc.call("diagram.deleteComment", { id: comment.id }))}>
-          Delete
-        </Button>
+        {confirmingDelete ? (
+          <>
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs text-destructive" onClick={() => void call(rpc.call("diagram.deleteComment", { id: comment.id }))}>
+              Delete for good
+            </Button>
+            <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setConfirmingDelete(false)}>
+              Keep
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setConfirmingDelete(true)}>
+            Delete
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -315,7 +328,7 @@ function NodePanel({
           {groupLinks}
         </div>
         <Button size="icon" variant="ghost" className="size-7" onClick={onClose} aria-label="Close">
-          <span aria-hidden className="text-base leading-none">×</span>
+          <Icon name="X" />
         </Button>
       </div>
       <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">

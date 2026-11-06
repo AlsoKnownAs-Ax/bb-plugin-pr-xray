@@ -66,6 +66,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
   const [diagramFocus, setDiagramFocus] = useState<{ groupId: string; nonce: number } | null>(null);
   const [localViewed, setLocalViewed] = useState<Map<string, boolean>>(new Map());
   const [chatRequest, setChatRequest] = useState<{ threadId: string; nonce: number } | null>(null);
+  const [editingTicket, setEditingTicket] = useState(false);
 
   useEffect(() => {
     if (uiStore.get().focusOnOpen) uiStore.set({ focusOnOpen: false });
@@ -110,7 +111,15 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
         for (const fingerprint of fingerprints) next.set(fingerprint, value);
         return next;
       });
-      rpc.call("hunks.setViewed", { ref: prRef, ...viewedRows(shownPr, fingerprints), viewed: value }).catch((cause: unknown) => toast.error(errorMessage(cause)));
+      rpc.call("hunks.setViewed", { ref: prRef, ...viewedRows(shownPr, fingerprints), viewed: value }).catch((cause: unknown) => {
+        // Fall back to the saved state so the checkbox doesn't claim a save that failed.
+        setLocalViewed((current) => {
+          const next = new Map(current);
+          for (const fingerprint of fingerprints) next.delete(fingerprint);
+          return next;
+        });
+        toast.error(errorMessage(cause));
+      });
     },
     [prRef, rpc, shownPr],
   );
@@ -178,12 +187,35 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             <span>·</span>
             <span>{pr.draft ? "draft" : pr.state}</span>
             {analysis?.diffOnly ? <span className="whitespace-nowrap rounded border border-border px-1.5">diff-only analysis</span> : null}
+            {data.ticketUrl !== null && !editingTicket ? (
+              <>
+                <span>·</span>
+                <span className="flex min-w-0 items-center gap-1">
+                  <Icon name="Link" className="size-3 shrink-0" />
+                  <a href={data.ticketUrl} target="_blank" rel="noreferrer" className="max-w-xs truncate hover:underline" title={data.ticketUrl}>
+                    {data.ticketOverridden ? "Ticket (set by you)" : "Ticket"}
+                  </a>
+                  <button type="button" className="hover:text-foreground hover:underline" onClick={() => setEditingTicket(true)}>
+                    Change
+                  </button>
+                </span>
+              </>
+            ) : null}
           </div>
           <h1 className="truncate text-base font-semibold">{pr.title}</h1>
         </div>
-        <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-          {(["diff", "explain"] as const).map((value) => (
-            <Button key={value} size="sm" variant="ghost" aria-pressed={tab === value} onClick={() => setTab(value)}>
+        <div role="tablist" aria-label="Review view" className="flex items-center gap-1 rounded-md border border-border p-0.5">
+          {(["diff", "explain"] as const).map((value, index) => (
+            <Button
+              key={value}
+              role="tab"
+              size="sm"
+              variant="ghost"
+              aria-selected={tab === value}
+              aria-keyshortcuts={String(index + 1)}
+              className="aria-selected:bg-state-active aria-selected:text-foreground"
+              onClick={() => setTab(value)}
+            >
               <Icon name={value === "diff" ? "FileDiff" : "Workflow"} />
               {value === "diff" ? "Diff" : "Explain"}
             </Button>
@@ -209,18 +241,13 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
         {analysis?.workerThreadId ? (
           <Button size="sm" variant="ghost" onClick={() => navigate.toThread(analysis.workerThreadId!)} aria-label="Open the agent run behind this analysis">
             <Icon name="Bot" />
-            Run
+            Agent run
           </Button>
         ) : null}
-        <Button size="sm" variant="ghost" onClick={() => setFocus(!focus)} aria-label="Focus mode (f)">
+        <Button size="sm" variant="ghost" onClick={() => setFocus(!focus)} aria-keyshortcuts={focus ? "f Escape" : "f"}>
           <Icon name={focus ? "Minimize2" : "Maximize2"} />
           {focus ? "Exit focus" : "Focus"}
         </Button>
-        {focus ? (
-          <Button size="icon" variant="ghost" className="size-8" onClick={() => setFocus(false)} aria-label="Close focus mode (Esc)">
-            <span aria-hidden className="text-base leading-none">×</span>
-          </Button>
-        ) : null}
       </header>
 
       {running && current ? (
@@ -237,7 +264,8 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
         stale={stale && !running}
         onReanalyse={() => void reanalyse()}
         ticketUrl={data.ticketUrl}
-        ticketOverridden={data.ticketOverridden}
+        editingTicket={editingTicket}
+        onEditingTicketChange={setEditingTicket}
         onSetTicket={async (url) => {
           await rpc.call("review.setTicket", { ref: prRef, url });
           refetch();
@@ -288,7 +316,13 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             The explanation appears here when the analysis finishes.
           </div>
         ) : (
-          <div className="p-6 text-sm text-muted-foreground">No analysis yet.</div>
+          <div className="flex flex-col items-start gap-3 p-6 text-sm text-muted-foreground">
+            No analysis yet. Analyse the PR to get a summary, walkthrough and diagrams.
+            <Button size="sm" variant="outline" onClick={() => void reanalyse()}>
+              <Icon name="Sparkles" />
+              Analyse
+            </Button>
+          </div>
         )}
       </div>
       <ChatBubble rpc={rpc} prRef={prRef} onAsk={askChat} openRequest={chatRequest} />
@@ -355,7 +389,8 @@ function Banners({
   stale,
   onReanalyse,
   ticketUrl,
-  ticketOverridden,
+  editingTicket: editing,
+  onEditingTicketChange: setEditing,
   onSetTicket,
 }: {
   /** The short commit still being shown, when the PR has moved past it. */
@@ -365,10 +400,11 @@ function Banners({
   stale: boolean;
   onReanalyse: () => void;
   ticketUrl: string | null;
-  ticketOverridden: boolean;
+  /** A linked ticket shows in the header; this row appears only to add or change it. */
+  editingTicket: boolean;
+  onEditingTicketChange: (editing: boolean) => void;
   onSetTicket: (url: string | null) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(ticketUrl ?? "");
   const banner = "flex flex-wrap items-center gap-2 border-b border-border px-4 py-1.5 text-xs";
   return (
@@ -383,21 +419,13 @@ function Banners({
           </Button>
         </div>
       ) : null}
-      {failed ? (
-        <div className={cn(banner, "text-destructive")}>
-          <Icon name="AlertTriangle" className="size-3.5" />
-          {failed}
+      {failed || stale ? (
+        // One analysis-status row: a failure outranks a stale result.
+        <div role={failed ? "alert" : "status"} className={cn(banner, failed ? "text-destructive" : "bg-muted/40")}>
+          <Icon name={failed ? "AlertTriangle" : "Commit"} className="size-3.5" />
+          {failed ?? "New commits since the last analysis."}
           <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={onReanalyse}>
-            Try again
-          </Button>
-        </div>
-      ) : null}
-      {stale ? (
-        <div className={cn(banner, "bg-muted/40")}>
-          <Icon name="Commit" className="size-3.5" />
-          New commits since the last analysis.
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={onReanalyse}>
-            Re-analyse
+            {failed ? "Try again" : "Re-analyse"}
           </Button>
         </div>
       ) : null}
@@ -427,18 +455,7 @@ function Banners({
           </form>
           <span>Re-analyse to use it.</span>
         </div>
-      ) : (
-        <div className={cn(banner, "text-muted-foreground")}>
-          <Icon name="Link" className="size-3.5" />
-          <a href={ticketUrl} target="_blank" rel="noreferrer" className="max-w-xl truncate hover:underline">
-            {ticketUrl}
-          </a>
-          {ticketOverridden ? <span>(set by you)</span> : null}
-          <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setEditing(true)}>
-            Change
-          </Button>
-        </div>
-      )}
+      ) : null}
     </>
   );
 }

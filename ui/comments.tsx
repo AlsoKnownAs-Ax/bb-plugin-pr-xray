@@ -243,8 +243,8 @@ export function ThreadView({
   return (
     <div
       className={cn(
-        "my-2 max-w-3xl overflow-hidden rounded-lg border border-l-4 font-sans text-sm shadow-xs",
-        settled ? "border-border border-l-muted-foreground/40 bg-card" : "border-warning/60 border-l-warning bg-warning/10",
+        "my-2 max-w-3xl overflow-hidden rounded-lg border border-border font-sans text-sm shadow-xs",
+        settled ? "bg-muted/30" : "bg-card",
       )}
     >
       <button
@@ -253,11 +253,11 @@ export function ThreadView({
         className={cn(
           "flex w-full items-center gap-2 px-3 py-2 text-left text-xs hover:bg-state-hover",
           !collapsed && "border-b",
-          settled ? "border-border text-muted-foreground" : "border-warning/40 text-foreground",
+          settled ? "border-border text-muted-foreground" : "border-border text-foreground",
         )}
       >
         <Icon name={collapsed ? "ChevronRight" : "ChevronDown"} className="size-3.5" />
-        {settled ? null : <Icon name="MessageSquare" className="size-3.5 shrink-0 text-warning-text" />}
+        {settled ? null : <Icon name="MessageSquare" className="size-3.5 shrink-0" />}
         <span className="shrink-0 font-medium text-foreground">{first?.author ?? "comment"}</span>
         <span className={cn("min-w-0 truncate", settled && "text-muted-foreground")}>{first?.body.replace(MARKER, "").split("\n")[0]?.replaceAll("`", "")}</span>
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -403,7 +403,7 @@ export function PendingView({
     );
   }
   return (
-    <div className="my-2 max-w-3xl rounded-lg border border-l-4 border-warning/50 border-l-warning bg-warning/5 px-3 py-2 font-sans text-sm">
+    <div className="my-2 max-w-3xl rounded-lg border border-warning/50 bg-warning/5 px-3 py-2 font-sans text-sm">
       <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
         <span className="rounded border border-warning/70 px-1.5 font-medium text-warning-text">pending</span>
         <span>{note}</span>
