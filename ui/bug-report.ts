@@ -1,4 +1,6 @@
 // Link to a prefilled GitHub bug report. Never pass the PR ref: the tracker is public, reviewed PRs often aren't.
+import { BUG_REPORT_TEMPLATE, REPO_URL } from "../shared/settings";
+
 export type OsName = "Windows" | "macOS" | "Linux" | "Unknown";
 
 const OS_MARKERS = [
@@ -11,9 +13,7 @@ export function osName(userAgent: string): OsName {
   return OS_MARKERS.find(({ marker }) => userAgent.includes(marker))?.os ?? "Unknown";
 }
 
-export const repoUrl = "https://github.com/AlsoKnownAs-Ax/bb-plugin-pr-xray";
-
 export function bugReportUrl(version: string, os: OsName): string {
-  const params = new URLSearchParams({ template: "bug_report.yml", version, os });
-  return `${repoUrl}/issues/new?${params}`;
+  const params = new URLSearchParams({ template: BUG_REPORT_TEMPLATE, version, os });
+  return `${REPO_URL}/issues/new?${params}`;
 }

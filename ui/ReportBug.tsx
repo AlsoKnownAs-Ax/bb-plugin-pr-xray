@@ -7,7 +7,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { version } from "../package.json";
 import { FOCUS } from "./FileTree";
-import { bugReportUrl, osName, repoUrl } from "./bug-report";
+import { REPO_URL } from "../shared/settings";
+import { bugReportUrl, osName } from "./bug-report";
 
 /** The preview popover. `children` gets the open state and must render a `PopoverTrigger`. */
 function ReportBugPopover({ children }: { children: (open: boolean) => ReactNode }) {
@@ -95,7 +96,7 @@ export function ReportBugFooter() {
       </span>
       <span className="flex items-center gap-x-2 whitespace-nowrap">
         <span aria-hidden="true">·</span>
-        <a href={repoUrl} target="_blank" rel="noreferrer" className={FOOTER_LINK}>
+        <a href={REPO_URL} target="_blank" rel="noreferrer" className={FOOTER_LINK}>
           GitHub
         </a>
       </span>
