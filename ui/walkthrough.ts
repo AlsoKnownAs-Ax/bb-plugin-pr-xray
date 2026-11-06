@@ -2,7 +2,7 @@
 // the box on that tab's render to zoom to.
 import type { Box, RenderAtlas } from "@coldtea/pr-lens-renderer";
 import type { CiteRef, GraphDoc, View, WalkthroughStep } from "@coldtea/pr-lens-schema";
-import type { DiagramTab } from "../shared/diagram-tabs";
+import { commentTargets, type DiagramTab } from "../shared/diagram-tabs";
 
 export type Focus = WalkthroughStep["focus"];
 /** A tab to show (undefined = stay on the current one) and what to focus there. */
@@ -48,6 +48,14 @@ export function citeTarget(doc: GraphDoc, tabs: DiagramTab[], ref: CiteRef): Tar
     tab: tab.id,
     focus: scope.kind === "all" ? ALL : selection({ lanes: scope.lanes, nodes: scope.nodes, edges: scope.edges, tables: scope.tables }),
   };
+}
+
+/** The tab to select a cited node or table on: the current tab if it draws it, else the first that does; null if none. */
+export function nodeTab(doc: GraphDoc, tabs: DiagramTab[], current: string, id: string): string | null {
+  const draws = (tab: DiagramTab) => commentTargets(doc, tab).has(id);
+  const here = tabs.find((tab) => tab.id === current);
+  if (here && draws(here)) return here.id;
+  return tabs.find(draws)?.id ?? null;
 }
 
 function findView(views: View[], id: string): View | undefined {

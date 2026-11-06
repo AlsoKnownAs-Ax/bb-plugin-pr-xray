@@ -1,8 +1,8 @@
 import type { RenderAtlas } from "@coldtea/pr-lens-renderer";
 import { describe, expect, it } from "vitest";
-import { postmarkRefactorGraph } from "@coldtea/pr-lens-schema/examples";
+import { billingOrgGraph, postmarkRefactorGraph } from "@coldtea/pr-lens-schema/examples";
 import { diagramTabs } from "../shared/diagram-tabs";
-import { citeTarget, focusBox, stepTarget } from "./walkthrough";
+import { citeTarget, focusBox, nodeTab, stepTarget } from "./walkthrough";
 
 const box = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
@@ -99,5 +99,29 @@ describe("walkthrough targets", () => {
     expect(citeTarget(doc, tabs, { kind: "node", node: "postmark" })).toBeNull();
     expect(citeTarget(doc, tabs, { kind: "view", view: "nope" })).toBeNull();
     expect(citeTarget(doc, tabs, { kind: "flow", flow: "nope" })).toBeNull();
+  });
+});
+
+describe("node cite tab", () => {
+  const doc = postmarkRefactorGraph;
+  const tabs = diagramTabs(doc);
+
+  it("stays on the current tab when it draws the node", () => {
+    expect(nodeTab(doc, tabs, "send-pipeline", "postmark")).toBe("send-pipeline");
+    expect(nodeTab(doc, tabs, "overview", "postmark")).toBe("overview");
+  });
+
+  it("switches to the first tab that draws the node", () => {
+    expect(nodeTab(doc, tabs, "send-pipeline", "build-bulk-payload")).toBe("overview");
+  });
+
+  it("finds a table on the data-model tab", () => {
+    const billingTabs = diagramTabs(billingOrgGraph);
+    const dataModel = billingTabs.find((tab) => tab.lens === "data-model")!.id;
+    expect(nodeTab(billingOrgGraph, billingTabs, billingTabs[0]!.id, "invoice")).toBe(dataModel);
+  });
+
+  it("is null when no tab draws it", () => {
+    expect(nodeTab(doc, tabs, "overview", "nope")).toBeNull();
   });
 });

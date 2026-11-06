@@ -14,7 +14,7 @@ import { overlayTargets, type OverlayTarget } from "./diagram-overlay";
 import { useAgentConfirmContext } from "./agent-confirm";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
-import { citeTarget, focusBox, stepTarget, type Focus, type Target } from "./walkthrough";
+import { citeTarget, focusBox, nodeTab, stepTarget, type Focus, type Target } from "./walkthrough";
 import { WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel } from "./WalkthroughPanel";
 import type { CiteRef } from "@coldtea/pr-lens-schema";
 
@@ -68,7 +68,18 @@ export function ExplainTab({
   };
   const citeAction = (ref: CiteRef) => {
     if (ref.kind === "file") return () => onOpenFile(ref.path);
-    // Node and table cites open the node panel (#34); column cites stay plain text.
+    // Node and table cites open the node panel; column cites stay plain text.
+    if (ref.kind === "node" || ref.kind === "table") {
+      const onTab = nodeTab(result.graph, tabs, tab.id, ref.kind === "node" ? ref.node : ref.table);
+      return onTab
+        ? () => {
+            // The step's zoom belongs to its own tab; drop it when switching away.
+            if (onTab !== tab.id) setFocus({ kind: "all" });
+            setTabId(onTab);
+            setSelectedId(ref.kind === "node" ? ref.node : ref.table);
+          }
+        : null;
+    }
     const target = citeTarget(result.graph, tabs, ref);
     return target ? () => show(target) : null;
   };
