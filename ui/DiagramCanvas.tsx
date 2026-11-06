@@ -46,9 +46,10 @@ function layoutDiagram(diagram: Diagram): Layout {
 }
 
 const STATUS_STYLE: Record<string, string> = {
-  added: "border-success/70 bg-success/10",
-  modified: "border-warning/70 bg-warning/10",
-  removed: "border-destructive/70 bg-destructive/10 opacity-80",
+  // Solid tint mixed into the card colour, so edges and the dot grid don't show through.
+  added: "border-success/70 bg-[color-mix(in_oklab,var(--success)_15%,var(--card))]",
+  modified: "border-warning/70 bg-[color-mix(in_oklab,var(--warning)_15%,var(--card))]",
+  removed: "border-destructive/70 bg-[color-mix(in_oklab,var(--destructive)_15%,var(--card))]",
   unchanged: "border-border bg-card",
 };
 const EDGE_STYLE: Record<string, string> = {
