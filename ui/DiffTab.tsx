@@ -22,6 +22,7 @@ import type { DraftComment, FixScope, Hunk, PendingComment, PrFile, ReviewGroup,
 import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
 import { FixCommentsButton } from "./FixCommentsButton";
+import { FileTreePrototype } from "./FileTree.prototype";
 import { prRefKey } from "../shared/pr-ref";
 import { canKeepDraft, draftInDiff, filesNotShown, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
@@ -124,6 +125,30 @@ export function DiffTab({
     return set;
   }, [files, groups, hunks, viewedHunks]);
 
+  // PROTOTYPE: File tree sidebar.
+  const [sidebar, setSidebar] = useState<"path" | "files">(() => (localStorage.getItem("pr-xray:sidebar") === "files" ? "files" : "path"));
+  const toggleSidebar = useCallback(
+    () =>
+      setSidebar((current) => {
+        const next = current === "path" ? "files" : "path";
+        localStorage.setItem("pr-xray:sidebar", next);
+        return next;
+      }),
+    [],
+  );
+  const [activePath, setActivePath] = useState<string | null>(null);
+  const viewedPaths = useMemo(
+    () => new Set(pr.files.filter((file) => file.hunkIds.length > 0 && file.hunkIds.every((id) => viewedHunks.has(hunks.get(id)?.fingerprint ?? ""))).map((file) => file.path)),
+    [hunks, pr.files, viewedHunks],
+  );
+  const groupsOfPath = useMemo(() => {
+    const map = new Map<string, number[]>();
+    groups.forEach((group, index) => {
+      for (const path of groupPaths.get(group.id) ?? []) map.set(path, [...(map.get(path) ?? []), index + 1]);
+    });
+    return map;
+  }, [groupPaths, groups]);
+
   const fingerprintsOf = (group: ReviewGroup, path?: string) =>
     group.hunkIds.flatMap((id) => {
       const hunk = hunks.get(id);
@@ -220,6 +245,30 @@ export function DiffTab({
     return () => observer.disconnect();
   }, [groups, onActiveGroupChange]);
 
+  // PROTOTYPE: highlight the file on screen; file sections exist with or without an analysis.
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        const path = visible?.target.getAttribute("data-file-path");
+        if (path) setActivePath(path);
+      },
+      { root, rootMargin: "0px 0px -70% 0px" },
+    );
+    root.querySelectorAll("[data-file-path]").forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [groups, openOverride, viewed]);
+
+  const openFile = (path: string, groupNumber?: number) => {
+    const group = groupNumber ? groups[groupNumber - 1] : groups.find((candidate) => groupPaths.get(candidate.id)?.includes(path));
+    if (!group) return;
+    setOpen(group.id, true);
+    setOpen(fileKey(group.id, path), true);
+    requestAnimationFrame(() => scrollTo(`file-${fileKey(group.id, path)}`));
+  };
+
   // Keyboard: j/k hunks, n/p groups, c comment on the current hunk, v toggles it viewed.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -247,6 +296,9 @@ export function DiffTab({
           onSetViewed([hunk.fingerprint], !viewedHunks.has(hunk.fingerprint));
           event.preventDefault();
         }
+      } else if (event.key === "t") {
+        toggleSidebar();
+        event.preventDefault();
       } else if (event.key === "c") {
         const hunk = hunks.get(activeHunk ?? groups.find((group) => group.id === activeGroupId)?.hunkIds[0] ?? "");
         const file = hunk ? files.get(hunk.fileIndex) : undefined;
@@ -259,7 +311,7 @@ export function DiffTab({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeHunk, activeGroupId, files, groups, hunkOrder, hunks, onSetViewed, scrollTo, viewedHunks]);
+  }, [activeHunk, activeGroupId, files, groups, hunkOrder, hunks, onSetViewed, scrollTo, toggleSidebar, viewedHunks]);
 
   const anchoredThreadIds = useMemo(() => {
     const ids = new Set<string>();
@@ -324,8 +376,22 @@ export function DiffTab({
     <div className="flex h-full min-h-0">
       <aside className="flex w-72 shrink-0 flex-col border-r border-border">
         <div className="space-y-2 border-b border-border p-3">
+          <div role="tablist" aria-label="Sidebar" className="flex gap-1 rounded-md border border-border p-0.5 text-xs">
+            {(["path", "files"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={sidebar === value}
+                className={cn("flex-1 rounded px-2 py-0.5", sidebar === value ? "bg-state-active" : "text-muted-foreground hover:bg-state-hover")}
+                onClick={() => sidebar !== value && toggleSidebar()}
+              >
+                {value === "path" ? "Reading path" : "Files"}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Reading path</span>
+            <span>Progress</span>
             <span>
               {viewedCount}/{groups.length} viewed
             </span>
@@ -345,7 +411,19 @@ export function DiffTab({
           ) : null}
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-          {groups.map((group, index) => (
+          {sidebar === "files" ? (
+            <FileTreePrototype
+              files={pr.files}
+              unlisted={filesNotShown(pr).unlisted}
+              prUrl={pr.url}
+              activePath={activePath}
+              viewedPaths={viewedPaths}
+              groupsOfPath={groupsOfPath}
+              groupCount={groups.length}
+              onOpen={openFile}
+            />
+          ) : null}
+          {sidebar === "path" && groups.map((group, index) => (
             <div
               key={group.id}
               className={cn(
@@ -396,7 +474,7 @@ export function DiffTab({
             {data.pending.length > 0 ? `Submit review (${data.pending.length})` : "Submit review"}
           </Button>
           <FixCommentsButton counts={{ mine: myOpenThreads, all: allOpenThreads }} onFix={(scope) => void fixComments(scope)} />
-          <p className="text-[11px] text-muted-foreground">j/k hunks · n/p groups · c comment · v viewed · f focus · 1/2 tabs</p>
+          <p className="text-[11px] text-muted-foreground">j/k hunks · n/p groups · c comment · v viewed · t files · f focus · 1/2 tabs</p>
         </div>
       </aside>
 
@@ -584,7 +662,7 @@ function GroupHunks({
           data.pr.threads.filter((thread) => !thread.isResolved && threadVisibleIn(thread, file.path, fileHunks)).length +
           data.pending.filter((comment) => comment.path === file.path && draftInDiff(comment, data.pr.headSha, fileHunks)).length;
         return (
-          <div key={fileIndex} id={`file-${fileKey(group.id, file.path)}`} className="scroll-mt-0 rounded-lg border border-border">
+          <div key={fileIndex} id={`file-${fileKey(group.id, file.path)}`} data-file-path={file.path} className="scroll-mt-0 rounded-lg border border-border">
             {/* Sticky so Viewed stays reachable while scrolling a long file. */}
             <div className={cn("sticky top-0 z-10 rounded-t-lg bg-background", !open && "rounded-b-lg")}>
               <div
