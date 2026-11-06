@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { version } from "../package.json";
+import { FOCUS } from "./FileTree";
 import { bugReportUrl, osName, repoUrl } from "./bug-report";
 
 /** The preview popover. `children` gets the open state and must render a `PopoverTrigger`. */
@@ -44,13 +46,22 @@ export function ReportBugPopover({ align, children }: { align: "start" | "end"; 
   );
 }
 
+/** Keep the tooltip shut while the popover is open; otherwise let it manage itself. */
+function tooltipOpen(popoverOpen: boolean): false | undefined {
+  if (popoverOpen) {
+    return false;
+  }
+
+  return undefined;
+}
+
 /** Icon-only header button. PopoverTrigger sits outside TooltipTrigger so its data-state drives the active fill. */
 export function ReportBugButton() {
   return (
     <ReportBugPopover align="end">
       {(open) => (
         <TooltipProvider delayDuration={300}>
-          <Tooltip open={open ? false : undefined}>
+          <Tooltip open={tooltipOpen(open)}>
             <PopoverTrigger asChild>
               <TooltipTrigger asChild>
                 <Button size="sm" variant="ghost" className="w-8 px-0" aria-label="Report a bug">
@@ -66,8 +77,7 @@ export function ReportBugButton() {
   );
 }
 
-const footerLink =
-  "rounded-sm underline-offset-2 hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
+const FOOTER_LINK = cn("rounded-sm underline-offset-2 hover:text-foreground hover:underline", FOCUS);
 
 /** Settings footer: version, "Report a bug" (same preview, start-aligned) and the repo link. */
 export function ReportBugFooter() {
@@ -76,21 +86,25 @@ export function ReportBugFooter() {
       <span>
         PR X-ray <span className="tabular-nums">{version}</span>
       </span>
-      <span aria-hidden="true">·</span>
-      <ReportBugPopover align="start">
-        {() => (
-          <PopoverTrigger asChild>
-            <button type="button" className={`flex cursor-pointer items-center gap-1 ${footerLink}`}>
-              <Icon name="Bug" className="size-3" />
-              Report a bug
-            </button>
-          </PopoverTrigger>
-        )}
-      </ReportBugPopover>
-      <span aria-hidden="true">·</span>
-      <a href={repoUrl} target="_blank" rel="noreferrer" className={footerLink}>
-        GitHub
-      </a>
+      <span className="flex items-center gap-x-2 whitespace-nowrap">
+        <span aria-hidden="true">·</span>
+        <ReportBugPopover align="start">
+          {() => (
+            <PopoverTrigger asChild>
+              <button type="button" className={cn("flex cursor-pointer items-center gap-1", FOOTER_LINK)}>
+                <Icon name="Bug" className="size-3" />
+                Report a bug
+              </button>
+            </PopoverTrigger>
+          )}
+        </ReportBugPopover>
+      </span>
+      <span className="flex items-center gap-x-2 whitespace-nowrap">
+        <span aria-hidden="true">·</span>
+        <a href={repoUrl} target="_blank" rel="noreferrer" className={FOOTER_LINK}>
+          GitHub
+        </a>
+      </span>
     </div>
   );
 }

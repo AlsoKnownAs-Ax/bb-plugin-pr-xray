@@ -1,11 +1,14 @@
 // Link to a prefilled GitHub bug report. Never pass the PR ref: the tracker is public, reviewed PRs often aren't.
 export type OsName = "Windows" | "macOS" | "Linux" | "Unknown";
 
+const OS_MARKERS = [
+  { marker: "Windows", os: "Windows" },
+  { marker: "Mac OS X", os: "macOS" },
+  { marker: "Linux", os: "Linux" },
+] satisfies { marker: string; os: OsName }[];
+
 export function osName(userAgent: string): OsName {
-  if (userAgent.includes("Windows")) return "Windows";
-  if (userAgent.includes("Mac OS X")) return "macOS";
-  if (userAgent.includes("Linux")) return "Linux";
-  return "Unknown";
+  return OS_MARKERS.find(({ marker }) => userAgent.includes(marker))?.os ?? "Unknown";
 }
 
 export const repoUrl = "https://github.com/AlsoKnownAs-Ax/bb-plugin-pr-xray";

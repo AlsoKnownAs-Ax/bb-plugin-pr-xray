@@ -16,7 +16,7 @@ import { DiffTab, type ViewMode } from "./DiffTab";
 import { displayGroups } from "./diff-utils";
 import { viewedRows } from "./hold-commit";
 import { ExplainTab } from "./ExplainTab";
-import { ReportBugButton } from "./ReportBugPopover";
+import { ReportBugButton } from "./ReportBug";
 import { uiStore } from "./store";
 import { errorMessage, useReview } from "./useReview";
 
