@@ -2,7 +2,7 @@ import type { RenderAtlas } from "@coldtea/pr-lens-renderer";
 import { describe, expect, it } from "vitest";
 import { billingOrgGraph, postmarkRefactorGraph } from "@coldtea/pr-lens-schema/examples";
 import { diagramTabs } from "../shared/diagram-tabs";
-import { citeTarget, focusBoxes, nodeTab, stepTarget, unionBox, veilHoles } from "./walkthrough";
+import { citeTarget, focusBoxes, nodeTab, progressLabel, stepForKey, stepTarget, unionBox, veilHoles } from "./walkthrough";
 
 const box = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
@@ -150,5 +150,30 @@ describe("node cite tab", () => {
 
   it("is undefined when no tab draws it", () => {
     expect(nodeTab(doc, tabs, "overview", "nope")).toBeUndefined();
+  });
+});
+
+describe("walkthrough keys", () => {
+  it("step forward from All to the first step, and stop at the last", () => {
+    expect(stepForKey("ArrowRight", null, 3)).toBe(0);
+    expect(stepForKey("ArrowRight", 0, 3)).toBe(1);
+    expect(stepForKey("ArrowRight", 2, 3)).toBe(2);
+  });
+
+  it("step back, stopping at the first, and from All to the first", () => {
+    expect(stepForKey("ArrowLeft", 2, 3)).toBe(1);
+    expect(stepForKey("ArrowLeft", 0, 3)).toBe(0);
+    expect(stepForKey("ArrowLeft", null, 3)).toBe(0);
+  });
+
+  it("ignore other keys", () => {
+    expect(stepForKey("Enter", 1, 3)).toBeUndefined();
+  });
+});
+
+describe("walkthrough progress", () => {
+  it("counts the steps on All, and says which step is shown otherwise", () => {
+    expect(progressLabel(null, 4)).toBe("4 steps");
+    expect(progressLabel(0, 4)).toBe("1 of 4");
   });
 });

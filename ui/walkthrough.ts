@@ -161,6 +161,32 @@ export function unionBox(boxes: Box[]): Box | null {
   };
 }
 
+/** The step an arrow key selects (`current` null = "All"); undefined for any other key. */
+export function stepForKey(key: string, current: number | null, count: number): number | undefined {
+  if (key === "ArrowLeft") {
+    return Math.max(0, (current ?? 0) - 1);
+  }
+
+  if (key !== "ArrowRight") {
+    return undefined;
+  }
+
+  if (current === null) {
+    return 0;
+  }
+
+  return Math.min(count - 1, current + 1);
+}
+
+/** The panel's step counter. */
+export function progressLabel(current: number | null, count: number): string {
+  if (current === null) {
+    return `${count} steps`;
+  }
+
+  return `${current + 1} of ${count}`;
+}
+
 const VEIL_PAD = 6;
 
 /** The holes the dimming veil leaves: each focused box with room round it. */

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { detailParts, type CiteRef, type WalkthroughStep } from "@coldtea/pr-lens-schema";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { progressLabel, stepForKey } from "./walkthrough";
 
 /** Width the panel takes over the canvas, including its margin, so fitting can keep clear of it. */
 export const WALKTHROUGH_PANEL_WIDTH = 344;
@@ -25,10 +26,16 @@ export function WalkthroughPanel({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, [contenteditable=true], [role=dialog]") || event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key === "ArrowRight") onSelect(current === null ? 0 : Math.min(steps.length - 1, current + 1));
-      else if (event.key === "ArrowLeft") onSelect(Math.max(0, (current ?? 0) - 1));
-      else return;
+      if (target?.closest("input, textarea, [contenteditable=true], [role=dialog]") || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      const next = stepForKey(event.key, current, steps.length);
+      if (next === undefined) {
+        return;
+      }
+
+      onSelect(next);
       event.preventDefault();
     };
     window.addEventListener("keydown", onKey);
@@ -42,7 +49,7 @@ export function WalkthroughPanel({
     >
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <span className="text-sm font-medium">Walkthrough</span>
-        <span className="text-xs text-muted-foreground">{current === null ? `${steps.length} steps` : `${current + 1} of ${steps.length}`}</span>
+        <span className="text-xs text-muted-foreground">{progressLabel(current, steps.length)}</span>
         <Button size="sm" variant="ghost" className="ml-auto h-6 px-2 text-xs" aria-pressed={current === null} onClick={() => onSelect(null)}>
           All
         </Button>
@@ -72,7 +79,7 @@ export function WalkthroughPanel({
             {index === current && step.detail ? (
               <p className="px-9 pb-2 text-xs text-muted-foreground">
                 {detailParts(step.detail).map((part, partIndex) => {
-                  const action = part.ref ? citeAction(part.ref) : null;
+                  const action = part.ref && citeAction(part.ref);
                   return action ? (
                     <button key={partIndex} type="button" className="text-foreground underline underline-offset-2 hover:text-primary" onClick={action}>
                       {part.text}
