@@ -6,14 +6,8 @@ import { usePrefersReducedMotion } from "@/components/ui/hooks/use-media-query";
 import { Icon } from "@/components/ui/icon";
 import type { Box } from "@coldtea/pr-lens-renderer";
 import type { DiagramRender } from "../shared/schema";
+import { fitView, zoomAt, zoomBy } from "./canvas-view";
 import { unionBox, veilHoles } from "./walkthrough";
-
-const MIN_SCALE = 0.1;
-const MAX_SCALE = 4;
-/** Room fitting leaves around the drawing. */
-const INSET = { side: 32, top: 48, bottom: 56 };
-
-const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 
 export function DiagramCanvas({
   render,
@@ -37,21 +31,13 @@ export function DiagramCanvas({
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
-  const zoomTo = unionBox(focus);
   const fit = () => {
     const box = containerRef.current?.getBoundingClientRect();
-    if (!box) return;
-    const target = zoomTo ?? { x: 0, y: 0, width: render.width, height: render.height };
-    // A narrow canvas has no room beside the panel, so the panel just overlaps it.
-    const right = reserveRight && box.width > reserveRight * 2 ? reserveRight : INSET.side;
-    const width = Math.max(1, box.width - INSET.side - right);
-    const height = Math.max(1, box.height - INSET.top - INSET.bottom);
-    const scale = Math.min(zoomTo ? 1.6 : 1.2, Math.max(MIN_SCALE, Math.min(width / target.width, height / target.height)));
-    setView({
-      scale,
-      x: INSET.side + (width - target.width * scale) / 2 - target.x * scale,
-      y: INSET.top + (height - target.height * scale) / 2 - target.y * scale,
-    });
+    if (!box) {
+      return;
+    }
+
+    setView(fitView(box, render, unionBox(focus), reserveRight));
   };
   const focusKey = JSON.stringify(focus);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,12 +65,7 @@ export function DiagramCanvas({
     if (!box) return;
     if (event.ctrlKey || event.metaKey) {
       const factor = Math.exp(-event.deltaY * 0.01);
-      setView((current) => {
-        const scale = clampScale(current.scale * factor);
-        const px = event.clientX - box.left;
-        const py = event.clientY - box.top;
-        return { scale, x: px - ((px - current.x) * scale) / current.scale, y: py - ((py - current.y) * scale) / current.scale };
-      });
+      setView((current) => zoomAt(current, factor, event.clientX - box.left, event.clientY - box.top));
     } else {
       setView((current) => ({ ...current, x: current.x - event.deltaX, y: current.y - event.deltaY }));
     }
@@ -105,7 +86,7 @@ export function DiagramCanvas({
     drag.current = null;
   };
 
-  const zoom = (factor: number) => setView((current) => ({ ...current, scale: clampScale(current.scale * factor) }));
+  const zoom = (factor: number) => setView((current) => zoomBy(current, factor));
 
   return (
     <div
