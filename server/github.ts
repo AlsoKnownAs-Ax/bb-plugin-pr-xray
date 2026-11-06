@@ -198,6 +198,7 @@ export function createGithub(getSettingsToken: () => Promise<string | undefined>
       // Not the URL's owner and repo: those are the old name after a rename.
       headInBaseRepo: pr.head.repo?.full_name.toLowerCase() === pr.base.repo.full_name.toLowerCase(),
       baseRef: pr.base.ref,
+      baseSha: pr.base.sha,
       viewer: viewer.login,
       isOwnPr: viewer.login.toLowerCase() === (pr.user?.login ?? "").toLowerCase(),
       changedFiles: pr.changed_files,

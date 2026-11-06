@@ -131,8 +131,8 @@ The palette is bb's neutral theme plus three semantic signals; the plugin never 
 
 ### Semantic
 - **Amber Attention** (`warning`, `warning-text`): "changed since viewed", pending (unsent) comments, new-commit and trust banners, medium-severity items. Open threads and comment counts are not warnings and stay neutral. Used as a 5–10% tint fill, a 50–70% border and `warning-text` for the words.
-- **Added** (`success`): additions counts and added diagram nodes.
-- **Removed / Error** (`destructive`): deletions, removed nodes, errors, high severity.
+- **Added** (`success`): additions counts.
+- **Removed / Error** (`destructive`): deletions, errors, high severity.
 
 ### Named Rules
 **The Borrowed Light Rule.** Every color is a bb theme variable. Never write a hex value in plugin UI; if a role is missing, use the nearest bb token.
@@ -151,7 +151,7 @@ The palette is bb's neutral theme plus three semantic signals; the plugin never 
 - **Body** (400, 13px, ~1.43): comments, walkthrough text, dialogs. Comment cards cap at 48rem wide.
 - **Body small** (400, 12px): meta lines, file rows, buttons in the `sm` size.
 - **Label** (500, 11px): chips, legends, counts, keyboard hints.
-- **Overline** (400, 10px, uppercase, 0.025em tracking): node kinds in diagrams, severity words.
+- **Overline** (400, 10px, uppercase, 0.025em tracking): node kind and change in the diagram node panel, severity words.
 - **Code** (mono, 12px): paths, SHAs, file lists.
 
 ### Named Rules
@@ -163,14 +163,14 @@ Content sits in a centered column up to 1400px wide, padded 16px on small screen
 
 ## Elevation & Depth
 
-Flat by default. Surfaces are separated by 1px theme borders and tonal fills, not shadows. A hairline shadow (`shadow-xs`) sits under comment cards, diagram nodes and the diagram toolbar so they read as objects on the table; diagram nodes rise to `shadow-md` on hover. Large shadows exist only for true floating layers: the chat launcher (`shadow-lg`) and the chat panel (`shadow-2xl`). Shadow values come from bb's theme.
+Flat by default. Surfaces are separated by 1px theme borders and tonal fills, not shadows. A hairline shadow (`shadow-xs`) sits under comment cards and the diagram zoom toolbar so they read as objects on the table. Large shadows exist only for true floating layers: the chat launcher (`shadow-lg`) and the chat panel (`shadow-2xl`). Shadow values come from bb's theme.
 
 ### Named Rules
 **The Light Table Rule.** Nothing on the page casts a real shadow. Only layers that float above it (chat, popovers, dialogs) do.
 
 ## Shapes
 
-Corners follow bb's `--radius`: controls and small panels use `md`, cards and diagram nodes `lg`, the chat panel `xl`. Chips, counters, pills and avatars are fully round. Diagram nodes use a 2px border colored by change kind.
+Corners follow bb's `--radius`: controls and small panels use `md`, cards, the diagram area and the walkthrough panel `lg`, the chat panel `xl`. Chips, counters, pills and avatars are fully round. Diagram node shapes are drawn by the PR Lens renderer, not by us.
 
 ## Components
 
@@ -201,8 +201,8 @@ Quiet and exact, from the bb kit (`components/ui/button.tsx`).
 ### Navigation
 Diff and Explain tabs and the file list use ghost rows: Pencil text at rest, Touch fill on hover, Active fill and ink text when selected. Viewed files dim to Pencil.
 
-### Diagram Node (signature)
-A positioned card with a 2px border and 10% fill tinted by change kind (success / warning / destructive), an uppercase overline for the node kind, and a full-round comment counter pinned to the top-right corner. Edges use the same kind colors as strokes; edge labels are 11px Pencil.
+### PR Lens Diagram (signature)
+The diagrams are PR Lens renders (ADR 0001): an SVG the server draws in light and dark, inlined in a pan/zoom canvas that fills the Explain tab's diagram area and takes the render's own background, so the drawing has no edge. Over it sits an atlas overlay in the SVG's own units: a click target per node or table (primary outline on hover and when selected) and a full-round comment pin on its top-right corner, ink when any comment is open, muted otherwise, counter-scaled to keep its screen size. The walkthrough panel floats over the canvas's right edge; picking a step zooms to its focus and dims the rest with a veil in the render's background colour, one hole per focused element, each with a primary rim.
 
 ## Do's and Don'ts
 
@@ -214,7 +214,7 @@ A positioned card with a 2px border and 10% fill tinted by change kind (success 
 - **Do** keep hover instant (`duration-0` in, 150ms out) on controls.
 
 ### Don't:
-- **Don't** hard-code hex colors or font families in plugin UI.
+- **Don't** hard-code hex colors or font families in plugin UI. The one exception is the PR Lens renderer's own palette and background inside the diagram canvas (ADR 0001).
 - **Don't** add shadows to on-page cards beyond the hairline; save real elevation for floating layers.
 - **Don't** put more than one solid (primary) button in the same area.
 - **Don't** load remote images or media in comment or analysis content; show links or plain text.

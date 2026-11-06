@@ -17,22 +17,33 @@ function normalizeRemote(url: string): string | null {
 
 export async function findProject(bb: BbPluginApi, ref: PrRef): Promise<ProjectMatch | null> {
   const wanted = `${ref.owner}/${ref.repo}`.toLowerCase();
-  const projects = await bb.sdk.projects.list();
-  for (const project of projects) {
-    const remote = (project as { gitRemoteUrl?: string | null }).gitRemoteUrl;
-    if (!remote || normalizeRemote(remote) !== wanted) continue;
-    const sources = (project as { sources?: { type: string; hostId: string; path?: string; isDefault?: boolean }[] })
-      .sources ?? [];
-    const source = sources.find((candidate) => candidate.isDefault) ?? sources[0];
-    return {
-      projectId: project.id,
-      projectName: project.name,
-      hostId: source?.hostId ?? null,
-      path: source?.type === "local_path" ? (source.path ?? null) : null,
-      remoteUrl: remote,
-    };
+  const projects = (await bb.sdk.projects.list()) as ListedProject[];
+  const project = projects.find((candidate) => candidate.gitRemoteUrl && normalizeRemote(candidate.gitRemoteUrl) === wanted);
+  if (!project?.gitRemoteUrl) {
+    return null;
   }
-  return null;
+
+  const sources = project.sources ?? [];
+  const source = sources.find((candidate) => candidate.isDefault) ?? sources[0];
+  return {
+    projectId: project.id,
+    projectName: project.name,
+    hostId: source?.hostId ?? null,
+    path: localPath(source),
+    remoteUrl: project.gitRemoteUrl,
+  };
+}
+
+type ProjectSource = { type: string; hostId: string; path?: string; isDefault?: boolean };
+/** The fields of a listed project we read; the SDK's type leaves them out. */
+type ListedProject = { id: string; name: string; gitRemoteUrl?: string | null; sources?: ProjectSource[] };
+
+function localPath(source: ProjectSource | undefined): string | null {
+  if (source?.type !== "local_path") {
+    return null;
+  }
+
+  return source.path ?? null;
 }
 
 export async function personalProjectId(bb: BbPluginApi): Promise<string> {

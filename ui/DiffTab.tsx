@@ -70,7 +70,8 @@ export function DiffTab({
   activeGroupId,
   onActiveGroupChange,
   scrollRequest,
-  onShowInDiagram,
+  fileRequest,
+  onFileRequestHandled,
 }: {
   data: ReviewGet;
   rpc: Rpc;
@@ -83,7 +84,10 @@ export function DiffTab({
   activeGroupId: string | null;
   onActiveGroupChange: (groupId: string) => void;
   scrollRequest: { groupId: string; nonce: number } | null;
-  onShowInDiagram: ((groupId: string) => void) | null;
+  /** A file to open, from a diagram's node panel. */
+  fileRequest: string | null;
+  /** Called once the request is handled, so returning to this tab doesn't repeat it. */
+  onFileRequestHandled: () => void;
 }) {
   const { pr } = data;
   const navigate = useBbNavigate();
@@ -214,16 +218,31 @@ export function DiffTab({
   /** Jumps to the file in reading-path group `groupNumber` (default: its first appearance), opening it if viewed. */
   const openFile = (path: string, groupNumber?: number) => {
     const group = groupNumber ? groups[groupNumber - 1] : groups.find((candidate) => groupPaths.get(candidate.id)?.includes(path));
-    if (!group) return;
+    if (!group) return false;
     setOpen(group.id, true);
     setOpen(fileKey(group.id, path), true);
     // Wait a frame so a just-expanded group has laid out before scrolling.
     requestAnimationFrame(() => scrollTo(`file-${fileKey(group.id, path)}`));
+    return true;
   };
 
   useEffect(() => {
     if (scrollRequest) scrollTo(`group-${scrollRequest.groupId}`);
   }, [scrollRequest, scrollTo]);
+
+  useEffect(() => {
+    if (!fileRequest) {
+      return;
+    }
+
+    if (!openFile(fileRequest)) {
+      toast.info(`${fileRequest} is not changed in this PR.`);
+    }
+
+    onFileRequestHandled();
+    // Only a new request opens a file; openFile changes on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileRequest]);
 
   // Track which group is on screen for the sidebar highlight.
   useEffect(() => {
@@ -503,12 +522,6 @@ export function DiffTab({
                   </button>
                   <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{KIND_LABEL[group.kind]}</span>
                   <div className="ml-auto flex items-center gap-2">
-                    {onShowInDiagram ? (
-                      <Button size="sm" variant="ghost" onClick={() => onShowInDiagram(group.id)}>
-                        <Icon name="Workflow" />
-                        Show in diagram
-                      </Button>
-                    ) : null}
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Checkbox checked={viewed.has(group.id)} onCheckedChange={(checked) => setGroupViewed(group, checked === true)} />
                       Viewed
