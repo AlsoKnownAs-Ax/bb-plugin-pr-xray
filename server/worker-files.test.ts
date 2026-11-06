@@ -118,6 +118,22 @@ describe("the analysis diff", () => {
     await vi.waitFor(() => expect(existsSync(dir)).toBe(false));
   });
 
+  it("is described in the worker's prompt with the PR description and hunk ids, or says they are empty", async () => {
+    const promptFor = async (details: PrDetails) => {
+      const { analysis, spawn } = setup();
+      await analysis.start(ref, { pr: details });
+      return (spawn.mock.calls[0]![0] as unknown as { prompt: string }).prompt;
+    };
+
+    const empty = await promptFor(pr);
+    expect(empty).toContain("<<<\n(empty)\n>>>");
+    expect(empty).toContain("Hunk ids: (none)");
+
+    const described = await promptFor({ ...pr, body: "Adds a cache.", hunks: [{ id: "h1" }, { id: "h2" }] } as unknown as PrDetails);
+    expect(described).toContain("<<<\nAdds a cache.\n>>>");
+    expect(described).toContain("Hunk ids: h1, h2");
+  });
+
   it("is deleted when the worker can't start", async () => {
     const { analysis, spawn, store } = setup();
     const before = new Set(readdirSync(tmpdir()));
