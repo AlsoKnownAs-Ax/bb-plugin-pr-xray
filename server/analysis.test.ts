@@ -158,6 +158,17 @@ describe("the analysis submit check", () => {
     expect(checked.ok ? [] : checked.problems).toContain("These hunks are in no group: h2.");
   });
 
+  it("rejects a duplicate group id, a hunk in two groups, and a look-closely spot on an unknown group", () => {
+    const group = { id: "g1", title: "Cache", why: "Faster.", kind: "core", hunkIds: ["h1"] };
+    const problems = problemsOf(
+      submission({
+        groups: [group, { ...group, title: "Again" }],
+        lookClosely: [{ title: "Expiry", reason: "No TTL.", severity: "high", groupIds: ["g1", "g9"] }],
+      }),
+    ).split("\n");
+    expect(problems).toEqual(["Duplicate group id g1.", "Hunk h1 is in both g1 and g1.", "lookClosely[0] references unknown group g9."]);
+  });
+
   it("skips the hunk checks when there is no PR snapshot", () => {
     expect(checkAnalysis(submission({ groups: [{ id: "g1", title: "Cache", why: "Faster.", kind: "core", hunkIds: ["h9"] }] }), null).ok).toBe(true);
   });

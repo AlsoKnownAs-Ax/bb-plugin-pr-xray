@@ -220,26 +220,49 @@ function crossCheck(result: Submission, pr: PrDetails | null): string[] {
     return [];
   }
 
-  const problems: string[] = [];
+  return [...hunkProblems(result.groups, pr), ...groupRefProblems(result)];
+}
+
+/** Group ids are unique and every hunk of the PR is in exactly one group. */
+function hunkProblems(groups: Submission["groups"], pr: PrDetails): string[] {
   const known = new Set(pr.hunks.map((hunk) => hunk.id));
-  const seen = new Map<string, string>();
-  const groupIds = new Set<string>();
-  for (const group of result.groups) {
-    if (groupIds.has(group.id)) problems.push(`Duplicate group id ${group.id}.`);
-    groupIds.add(group.id);
-    for (const hunkId of group.hunkIds) {
-      if (!known.has(hunkId)) problems.push(`Group ${group.id} references unknown hunk ${hunkId}.`);
-      else if (seen.has(hunkId)) problems.push(`Hunk ${hunkId} is in both ${seen.get(hunkId)} and ${group.id}.`);
-      else seen.set(hunkId, group.id);
+  const owner = new Map<string, string>();
+  const problems: string[] = [];
+  groups.forEach((group, index) => {
+    if (groups.findIndex((other) => other.id === group.id) < index) {
+      problems.push(`Duplicate group id ${group.id}.`);
     }
+
+    group.hunkIds.forEach((hunkId) => problems.push(...placeHunk(hunkId, group.id, known, owner)));
+  });
+  const missing = [...known].filter((hunkId) => !owner.has(hunkId));
+  if (missing.length > 0) {
+    problems.push(`These hunks are in no group: ${missing.join(", ")}.`);
   }
-  const missing = [...known].filter((hunkId) => !seen.has(hunkId));
-  if (missing.length > 0) problems.push(`These hunks are in no group: ${missing.join(", ")}.`);
-  const checkGroupRefs = (where: string, ids: string[]) => {
-    for (const id of ids) if (!groupIds.has(id)) problems.push(`${where} references unknown group ${id}.`);
-  };
-  result.lookClosely.forEach((item, index) => checkGroupRefs(`lookClosely[${index}]`, item.groupIds));
+
   return problems;
+}
+
+/** Records the hunk's group in `owner`, or says why it can't go there. */
+function placeHunk(hunkId: string, groupId: string, known: Set<string>, owner: Map<string, string>): string[] {
+  if (!known.has(hunkId)) {
+    return [`Group ${groupId} references unknown hunk ${hunkId}.`];
+  }
+
+  const first = owner.get(hunkId);
+  if (first !== undefined) {
+    return [`Hunk ${hunkId} is in both ${first} and ${groupId}.`];
+  }
+
+  owner.set(hunkId, groupId);
+  return [];
+}
+
+function groupRefProblems(result: Submission): string[] {
+  const groupIds = new Set(result.groups.map((group) => group.id));
+  return result.lookClosely.flatMap((item, index) =>
+    item.groupIds.filter((id) => !groupIds.has(id)).map((id) => `lookClosely[${index}] references unknown group ${id}.`),
+  );
 }
 
 export function createAnalysis(deps: {
