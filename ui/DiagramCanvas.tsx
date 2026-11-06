@@ -1,6 +1,6 @@
 // Pan/zoom canvas for one diagram: the PR Lens SVG the server rendered, shown
 // inline. The renderer escapes model text and emits no script, so inline is safe.
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { usePrefersReducedMotion } from "@/components/ui/hooks/use-media-query";
 import { Icon } from "@/components/ui/icon";
@@ -9,11 +9,20 @@ import type { DiagramRender } from "../shared/schema";
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 4;
 
-export function DiagramCanvas({ render }: { render: DiagramRender }) {
+export function DiagramCanvas({
+  render,
+  overlay,
+  onBackgroundClick,
+}: {
+  render: DiagramRender;
+  /** Drawn over the SVG in its viewBox units; gets the zoom so pins can keep their screen size. */
+  overlay?: (scale: number) => ReactNode;
+  onBackgroundClick?: () => void;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgHostRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
-  const drag = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
   const fit = () => {
@@ -59,15 +68,17 @@ export function DiagramCanvas({ render }: { render: DiagramRender }) {
   };
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button")) return;
-    drag.current = { x: event.clientX, y: event.clientY, vx: view.x, vy: view.y };
+    drag.current = { x: event.clientX, y: event.clientY, vx: view.x, vy: view.y, moved: false };
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const state = drag.current;
     if (!state) return;
+    if (Math.abs(event.clientX - state.x) + Math.abs(event.clientY - state.y) > 3) state.moved = true;
     setView((current) => ({ ...current, x: state.vx + event.clientX - state.x, y: state.vy + event.clientY - state.y }));
   };
   const onPointerUp = () => {
+    if (drag.current && !drag.current.moved) onBackgroundClick?.();
     drag.current = null;
   };
 
@@ -82,13 +93,16 @@ export function DiagramCanvas({ render }: { render: DiagramRender }) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onLostPointerCapture={onPointerUp}
+      onLostPointerCapture={() => {
+        drag.current = null;
+      }}
     >
       <div
         className="absolute left-0 top-0 origin-top-left"
         style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`, width: render.width, height: render.height }}
       >
         <div ref={svgHostRef} className="[&>svg]:block" dangerouslySetInnerHTML={{ __html: render.svg }} />
+        {overlay?.(view.scale)}
       </div>
       <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-md border border-border bg-background/90 p-1 shadow-xs">
         <Button size="icon" variant="ghost" className="size-7" onClick={() => zoom(1 / 1.2)} aria-label="Zoom out">

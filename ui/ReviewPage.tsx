@@ -64,6 +64,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
   const [view, setView] = useState<ViewMode>(() => (localStorage.getItem("pr-xray:view") as ViewMode) ?? "unified");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [scrollRequest, setScrollRequest] = useState<{ groupId: string; nonce: number } | null>(null);
+  const [fileRequest, setFileRequest] = useState<{ path: string; nonce: number } | null>(null);
   const [localViewed, setLocalViewed] = useState<Map<string, boolean>>(new Map());
   const [chatRequest, setChatRequest] = useState<{ threadId: string; nonce: number } | null>(null);
   const [editingTicket, setEditingTicket] = useState(false);
@@ -284,6 +285,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             activeGroupId={activeGroupId}
             onActiveGroupChange={setActiveGroupId}
             scrollRequest={scrollRequest}
+            fileRequest={fileRequest}
           />
         ) : analysis?.result ? (
           <ExplainTab
@@ -294,6 +296,10 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             onOpenGroup={(groupId) => {
               setTab("diff");
               setScrollRequest({ groupId, nonce: Date.now() });
+            }}
+            onOpenFile={(path) => {
+              setTab("diff");
+              setFileRequest({ path, nonce: Date.now() });
             }}
           />
         ) : running ? (
