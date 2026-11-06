@@ -70,6 +70,7 @@ export function DiffTab({
   activeGroupId,
   onActiveGroupChange,
   scrollRequest,
+  fileRequest,
 }: {
   data: ReviewGet;
   rpc: Rpc;
@@ -82,6 +83,8 @@ export function DiffTab({
   activeGroupId: string | null;
   onActiveGroupChange: (groupId: string) => void;
   scrollRequest: { groupId: string; nonce: number } | null;
+  /** A file to open, from a diagram's node panel. */
+  fileRequest: { path: string; nonce: number } | null;
 }) {
   const { pr } = data;
   const navigate = useBbNavigate();
@@ -212,16 +215,23 @@ export function DiffTab({
   /** Jumps to the file in reading-path group `groupNumber` (default: its first appearance), opening it if viewed. */
   const openFile = (path: string, groupNumber?: number) => {
     const group = groupNumber ? groups[groupNumber - 1] : groups.find((candidate) => groupPaths.get(candidate.id)?.includes(path));
-    if (!group) return;
+    if (!group) return false;
     setOpen(group.id, true);
     setOpen(fileKey(group.id, path), true);
     // Wait a frame so a just-expanded group has laid out before scrolling.
     requestAnimationFrame(() => scrollTo(`file-${fileKey(group.id, path)}`));
+    return true;
   };
 
   useEffect(() => {
     if (scrollRequest) scrollTo(`group-${scrollRequest.groupId}`);
   }, [scrollRequest, scrollTo]);
+
+  useEffect(() => {
+    if (fileRequest && !openFile(fileRequest.path)) toast.info(`${fileRequest.path} is not changed in this PR.`);
+    // Only a new request opens a file; openFile changes on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileRequest]);
 
   // Track which group is on screen for the sidebar highlight.
   useEffect(() => {

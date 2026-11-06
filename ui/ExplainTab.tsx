@@ -8,8 +8,9 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { diagramTabs } from "../shared/diagram-tabs";
 import type { AnalysisRecord, ReviewGroup, StoredComment } from "../shared/schema";
-import { TagChip } from "./comments";
+import { Composer, TagChip } from "./comments";
 import { DiagramCanvas } from "./DiagramCanvas";
+import { overlayTargets, type OverlayTarget } from "./diagram-overlay";
 import { useAgentConfirmContext } from "./agent-confirm";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
@@ -26,12 +27,14 @@ export function ExplainTab({
   rpc,
   groups,
   onOpenGroup,
+  onOpenFile,
 }: {
   data: ReviewGet;
   analysis: AnalysisRecord;
   rpc: Rpc;
   groups: ReviewGroup[];
   onOpenGroup: (groupId: string) => void;
+  onOpenFile: (path: string) => void;
 }) {
   const result = analysis.result!;
   const navigate = useBbNavigate();
@@ -42,6 +45,10 @@ export function ExplainTab({
   const tab = tabs.find((candidate) => candidate.id === tabId) ?? tabs[0]!;
   const render = result.renders[tab.id]?.[theme];
   const diagramComments = data.comments.filter((comment) => comment.source === "diagram");
+  const targets = render ? overlayTargets(result.graph, tab, render.atlas, diagramComments) : [];
+  // A node or table on the current tab, by id.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = targets.find((target) => target.id === selectedId);
 
   const { confirmAgent } = useAgentConfirmContext();
   const fixAll = async () => {
@@ -80,7 +87,9 @@ export function ExplainTab({
   const outdated = diagramComments.filter((comment) => comment.status === "outdated");
   const resolved = diagramComments.filter((comment) => comment.status === "resolved");
   const selectComment = (comment: StoredComment) => {
-    if (tabs.some((candidate) => candidate.id === comment.diagramId)) setTabId(comment.diagramId!);
+    if (!tabs.some((candidate) => candidate.id === comment.diagramId)) return;
+    setTabId(comment.diagramId!);
+    setSelectedId(comment.nodeId);
   };
 
   return (
@@ -106,7 +115,16 @@ export function ExplainTab({
               <h2 className="text-base font-semibold">Diagrams</h2>
               <div className="flex flex-wrap gap-1">
                 {tabs.map((candidate) => (
-                  <Button key={candidate.id} size="sm" variant="ghost" aria-pressed={candidate.id === tab.id} onClick={() => setTabId(candidate.id)}>
+                  <Button
+                    key={candidate.id}
+                    size="sm"
+                    variant="ghost"
+                    aria-pressed={candidate.id === tab.id}
+                    onClick={() => {
+                      setTabId(candidate.id);
+                      setSelectedId(null);
+                    }}
+                  >
                     {candidate.title}
                   </Button>
                 ))}
@@ -114,7 +132,14 @@ export function ExplainTab({
               <span className="ml-auto text-xs text-muted-foreground">⌘/Ctrl + scroll to zoom · drag to pan</span>
             </div>
             <div className="relative h-[60vh] overflow-hidden rounded-lg border border-border">
-              {render ? <DiagramCanvas key={tab.id} render={render} /> : null}
+              {render ? (
+                <DiagramCanvas
+                  key={tab.id}
+                  render={render}
+                  onBackgroundClick={() => setSelectedId(null)}
+                  overlay={(scale) => <DiagramOverlay targets={targets} selectedId={selectedId} scale={scale} onSelect={setSelectedId} />}
+                />
+              ) : null}
             </div>
           </section>
 
@@ -139,25 +164,38 @@ export function ExplainTab({
       </div>
 
       <aside className="flex w-80 shrink-0 flex-col border-l border-border">
-        <div className="flex min-h-0 flex-1 flex-col">
-          <div className="border-b border-border p-3">
-            <div className="text-sm font-medium">Design comments</div>
-            <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
+        {selected ? (
+          <NodePanel
+            data={data}
+            analysis={analysis}
+            tabId={tab.id}
+            target={selected}
+            comments={diagramComments.filter((comment) => comment.diagramId === tab.id && comment.nodeId === selected.id)}
+            rpc={rpc}
+            onOpenFile={onOpenFile}
+            onClose={() => setSelectedId(null)}
+          />
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="border-b border-border p-3">
+              <div className="text-sm font-medium">Design comments</div>
+              <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
+            </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+              {diagramComments.length === 0 ? <p className="text-sm text-muted-foreground">No design comments yet.</p> : null}
+              <CommentList title="Open" comments={open} rpc={rpc} onSelect={selectComment} />
+              <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
+              <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={selectComment} />
+            </div>
+            {/* The right padding keeps this clear of the floating chat button. */}
+            <div className="border-t border-border p-3 pr-20">
+              <Button className="w-full" size="sm" disabled={open.length === 0} onClick={() => void fixAll()}>
+                <Icon name="Bot" />
+                Fix all diagram comments{open.length ? ` (${open.length})` : ""}
+              </Button>
+            </div>
           </div>
-          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-            {diagramComments.length === 0 ? <p className="text-sm text-muted-foreground">No design comments yet.</p> : null}
-            <CommentList title="Open" comments={open} rpc={rpc} onSelect={selectComment} />
-            <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
-            <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={selectComment} />
-          </div>
-          {/* The right padding keeps this clear of the floating chat button. */}
-          <div className="border-t border-border p-3 pr-20">
-            <Button className="w-full" size="sm" disabled={open.length === 0} onClick={() => void fixAll()}>
-              <Icon name="Bot" />
-              Fix all diagram comments{open.length ? ` (${open.length})` : ""}
-            </Button>
-          </div>
-        </div>
+        )}
       </aside>
     </div>
   );
@@ -227,6 +265,120 @@ function DiagramCommentCard({ comment, rpc, onSelect }: { comment: StoredComment
             Delete
           </Button>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Click targets and comment pins over the SVG, in its viewBox units, so they stay on their card at any zoom. */
+function DiagramOverlay({
+  targets,
+  selectedId,
+  scale,
+  onSelect,
+}: {
+  targets: OverlayTarget[];
+  selectedId: string | null;
+  scale: number;
+  onSelect: (id: string) => void;
+}) {
+  return targets.map((target) => (
+    <button
+      key={target.id}
+      type="button"
+      aria-label={`${target.label}: details and comments`}
+      aria-pressed={target.id === selectedId}
+      className="absolute rounded-lg outline-2 outline-offset-2 outline-primary hover:outline aria-pressed:outline"
+      style={{ left: target.box.x, top: target.box.y, width: target.box.width, height: target.box.height }}
+      onClick={() => onSelect(target.id)}
+    >
+      {target.pins > 0 ? (
+        <span
+          className={cn(
+            "absolute -right-2.5 -top-2.5 flex h-6 min-w-6 origin-bottom-left items-center justify-center rounded-full rounded-bl-none border-2 border-background px-1 text-[11px] font-semibold shadow",
+            target.openPins > 0 ? "bg-foreground text-background" : "bg-muted text-muted-foreground",
+          )}
+          // Counter the zoom so the pin keeps its size on screen.
+          style={{ transform: `scale(${1 / scale})` }}
+          aria-label={`${target.pins} comments, ${target.openPins} open`}
+        >
+          {target.pins}
+        </span>
+      ) : null}
+    </button>
+  ));
+}
+
+function NodePanel({
+  data,
+  analysis,
+  tabId,
+  target,
+  comments,
+  rpc,
+  onOpenFile,
+  onClose,
+}: {
+  data: ReviewGet;
+  analysis: AnalysisRecord;
+  tabId: string;
+  target: OverlayTarget;
+  comments: StoredComment[];
+  rpc: Rpc;
+  onOpenFile: (path: string) => void;
+  onClose: () => void;
+}) {
+  const isCurrent = analysis.headSha === data.pr.headSha;
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-start gap-2 border-b border-border p-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] uppercase text-muted-foreground">
+            {target.kind} · {target.delta}
+          </div>
+          <div className="font-medium">{target.label}</div>
+          {target.files.length > 0 ? (
+            <ul className="mt-1.5 space-y-0.5">
+              {target.files.map((path) => (
+                <li key={path}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenFile(path)}
+                    className="inline-flex max-w-full items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    <Icon name="FileDiff" className="size-3 shrink-0" />
+                    <span className="truncate">{path}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <Button size="icon" variant="ghost" className="size-7" onClick={onClose} aria-label="Close">
+          <Icon name="X" />
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+        {comments.map((comment) => (
+          <DiagramCommentCard key={comment.id} comment={comment} rpc={rpc} />
+        ))}
+        <Composer
+          key={`${target.id}-${comments.length}`}
+          placeholder="What is wrong with this part of the design?"
+          autoFocus={comments.length === 0}
+          actions={[
+            {
+              label: "Comment",
+              primary: true,
+              run: async (body) => {
+                await rpc.call("diagram.addComment", { ref: data.pr.ref, analysisId: analysis.id, diagramId: tabId, nodeId: target.id, body });
+              },
+            },
+          ]}
+        />
+        {!isCurrent ? (
+          <p className="text-[11px] text-muted-foreground">This diagram is from an older commit; re-analyse to comment on the latest design.</p>
+        ) : null}
       </div>
     </div>
   );
