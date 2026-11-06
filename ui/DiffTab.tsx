@@ -22,6 +22,7 @@ import type { DraftComment, FixScope, Hunk, PendingComment, PrFile, ReviewGroup,
 import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
 import { FixCommentsButton } from "./FixCommentsButton";
+import { FileTree } from "./FileTree";
 import { prRefKey } from "../shared/pr-ref";
 import { canKeepDraft, draftInDiff, filesNotShown, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
@@ -200,6 +201,22 @@ export function DiffTab({
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  const [sidebar, setSidebar] = useState<"path" | "files">(() => (localStorage.getItem("pr-xray:sidebar") === "files" ? "files" : "path"));
+  useEffect(() => localStorage.setItem("pr-xray:sidebar", sidebar), [sidebar]);
+  const toggleSidebar = useCallback(() => setSidebar((current) => (current === "path" ? "files" : "path")), []);
+  // shortcut: files without hunks (binary, oversized) have nowhere to jump, so they're left out until #19 gives them a row.
+  const treeFiles = useMemo(() => pr.files.filter((file) => file.hunkIds.length > 0), [pr.files]);
+
+  /** Jumps to the file's first appearance in the reading path, opening it if viewed. */
+  const openFile = (path: string) => {
+    const group = groups.find((candidate) => groupPaths.get(candidate.id)?.includes(path));
+    if (!group) return;
+    setOpen(group.id, true);
+    setOpen(fileKey(group.id, path), true);
+    // Wait a frame so a just-expanded group has laid out before scrolling.
+    requestAnimationFrame(() => scrollTo(`file-${fileKey(group.id, path)}`));
+  };
+
   useEffect(() => {
     if (scrollRequest) scrollTo(`group-${scrollRequest.groupId}`);
   }, [scrollRequest, scrollTo]);
@@ -247,6 +264,9 @@ export function DiffTab({
           onSetViewed([hunk.fingerprint], !viewedHunks.has(hunk.fingerprint));
           event.preventDefault();
         }
+      } else if (event.key === "t") {
+        toggleSidebar();
+        event.preventDefault();
       } else if (event.key === "c") {
         const hunk = hunks.get(activeHunk ?? groups.find((group) => group.id === activeGroupId)?.hunkIds[0] ?? "");
         const file = hunk ? files.get(hunk.fileIndex) : undefined;
@@ -259,7 +279,7 @@ export function DiffTab({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeHunk, activeGroupId, files, groups, hunkOrder, hunks, onSetViewed, scrollTo, viewedHunks]);
+  }, [activeHunk, activeGroupId, files, groups, hunkOrder, hunks, onSetViewed, scrollTo, toggleSidebar, viewedHunks]);
 
   const anchoredThreadIds = useMemo(() => {
     const ids = new Set<string>();
@@ -324,8 +344,22 @@ export function DiffTab({
     <div className="flex h-full min-h-0">
       <aside className="flex w-72 shrink-0 flex-col border-r border-border">
         <div className="space-y-2 border-b border-border p-3">
+          <div role="tablist" aria-label="Sidebar" className="flex gap-1 rounded-md border border-border p-0.5 text-xs">
+            {(["path", "files"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={sidebar === value}
+                className={cn("flex-1 rounded px-2 py-0.5", sidebar === value ? "bg-state-active" : "text-muted-foreground hover:bg-state-hover")}
+                onClick={() => setSidebar(value)}
+              >
+                {value === "path" ? "Reading path" : "Files"}
+              </button>
+            ))}
+          </div>
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Reading path</span>
+            <span>Progress</span>
             <span>
               {viewedCount}/{groups.length} viewed
             </span>
@@ -345,7 +379,8 @@ export function DiffTab({
           ) : null}
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-          {groups.map((group, index) => (
+          {sidebar === "files" ? <FileTree files={treeFiles} onOpen={openFile} /> : null}
+          {sidebar === "path" && groups.map((group, index) => (
             <div
               key={group.id}
               className={cn(
@@ -396,7 +431,7 @@ export function DiffTab({
             {data.pending.length > 0 ? `Submit review (${data.pending.length})` : "Submit review"}
           </Button>
           <FixCommentsButton counts={{ mine: myOpenThreads, all: allOpenThreads }} onFix={(scope) => void fixComments(scope)} />
-          <p className="text-[11px] text-muted-foreground">j/k hunks · n/p groups · c comment · v viewed · f focus · 1/2 tabs</p>
+          <p className="text-[11px] text-muted-foreground">j/k hunks · n/p groups · c comment · v viewed · t files · f focus · 1/2 tabs</p>
         </div>
       </aside>
 
