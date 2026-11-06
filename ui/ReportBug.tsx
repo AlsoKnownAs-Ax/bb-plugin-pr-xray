@@ -10,13 +10,13 @@ import { FOCUS } from "./FileTree";
 import { bugReportUrl, osName, repoUrl } from "./bug-report";
 
 /** The preview popover. `children` gets the open state and must render a `PopoverTrigger`. */
-export function ReportBugPopover({ align, children }: { align: "start" | "end"; children: (open: boolean) => ReactNode }) {
+function ReportBugPopover({ children }: { children: (open: boolean) => ReactNode }) {
   const [open, setOpen] = useState(false);
   const os = osName(navigator.userAgent);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       {children(open)}
-      <PopoverContent align={align} aria-labelledby="report-bug-title" mobileTitle="Report a bug" className="w-72 space-y-3 text-sm">
+      <PopoverContent align="end" aria-labelledby="report-bug-title" mobileTitle="Report a bug" className="w-72 space-y-3 text-sm">
         <div className="space-y-1">
           <h2 id="report-bug-title" className="font-semibold">
             Report a bug
@@ -58,7 +58,7 @@ function tooltipOpen(popoverOpen: boolean): false | undefined {
 /** Icon-only header button. PopoverTrigger sits outside TooltipTrigger so its data-state drives the active fill. */
 export function ReportBugButton() {
   return (
-    <ReportBugPopover align="end">
+    <ReportBugPopover>
       {(open) => (
         <TooltipProvider delayDuration={300}>
           <Tooltip open={tooltipOpen(open)}>
@@ -79,7 +79,7 @@ export function ReportBugButton() {
 
 const FOOTER_LINK = cn("rounded-sm underline-offset-2 hover:text-foreground hover:underline", FOCUS);
 
-/** Settings footer: version, "Report a bug" (same preview, start-aligned) and the repo link. */
+/** Settings footer: version, a direct "Report a bug" link and the repo link. */
 export function ReportBugFooter() {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
@@ -88,16 +88,10 @@ export function ReportBugFooter() {
       </span>
       <span className="flex items-center gap-x-2 whitespace-nowrap">
         <span aria-hidden="true">·</span>
-        <ReportBugPopover align="start">
-          {() => (
-            <PopoverTrigger asChild>
-              <button type="button" className={cn("flex cursor-pointer items-center gap-1", FOOTER_LINK)}>
-                <Icon name="Bug" className="size-3" />
-                Report a bug
-              </button>
-            </PopoverTrigger>
-          )}
-        </ReportBugPopover>
+        <a href={bugReportUrl(version, osName(navigator.userAgent))} target="_blank" rel="noreferrer" className={cn("flex items-center gap-1", FOOTER_LINK)}>
+          <Icon name="Bug" className="size-3" />
+          Report a bug
+        </a>
       </span>
       <span className="flex items-center gap-x-2 whitespace-nowrap">
         <span aria-hidden="true">·</span>
