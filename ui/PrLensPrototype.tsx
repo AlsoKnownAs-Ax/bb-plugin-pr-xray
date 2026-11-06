@@ -8,14 +8,23 @@ import type { View, WalkthroughStep } from "@coldtea/pr-lens-schema";
 import type { Box, RenderAtlas, RenderedSvg } from "@coldtea/pr-lens-renderer";
 import renders from "./pr-lens-prototype.renders.json";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/ui/icon";
+import { Input } from "@/components/ui/input";
 import { usePrefersReducedMotion } from "@/components/ui/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
 // Pre-rendered by pr-lens-prototype.render.mjs: the renderer needs node:crypto.
-type Rendered = Pick<RenderedSvg, "svg" | "width" | "height" | "animated" | "atlas">;
+// `background` is the renderer's baked palette background for that theme.
+type Rendered = Pick<RenderedSvg, "svg" | "width" | "height" | "animated" | "atlas"> & { background: string };
 const DOCS = renders as unknown as Record<string, { views: View[]; walkthrough: WalkthroughStep[]; renders: Record<string, Rendered> }>;
+const DOC_NAMES = Object.keys(DOCS);
 
 type Pin = { key: string; kind: "node" | "table"; id: string; text: string };
+
+// Floating layers over the canvas: the only things on the page that cast a shadow.
+const PANEL = "pointer-events-auto rounded-lg border border-border bg-background shadow-lg";
+// Room the floating panels take, so fitting never hides content under them.
+const FIT_INSET = { left: 32, top: 72, bottom: 72, right: 32, rightWithPanel: 352 };
 
 function union(boxes: Box[]): Box | null {
   if (boxes.length === 0) return null;
@@ -48,7 +57,7 @@ function viewForStep(step: WalkthroughStep, views: View[]): View | undefined {
 export function PrLensPrototype() {
   const codeTheme = useCodeTheme();
   const prefersReducedMotion = usePrefersReducedMotion();
-  const [docName, setDocName] = useState(Object.keys(DOCS)[0]!);
+  const [docName, setDocName] = useState(DOC_NAMES[0]!);
   const [themeOverride, setThemeOverride] = useState<"auto" | "light" | "dark">("auto");
   const [forcePause, setForcePause] = useState(false);
   const doc = DOCS[docName]!;
@@ -56,6 +65,7 @@ export function PrLensPrototype() {
   const [viewId, setViewId] = useState(views[0]!.id);
   const [stepIndex, setStepIndex] = useState<number | null>(null);
   const [pins, setPins] = useState<Pin[]>([]);
+  const [showState, setShowState] = useState(false);
   const [selected, setSelected] = useState<{ kind: "node" | "table"; id: string } | null>(null);
   const theme = themeOverride === "auto" ? codeTheme.mode : themeOverride;
   const steps = doc.walkthrough;
@@ -63,7 +73,7 @@ export function PrLensPrototype() {
   const view = views.find((candidate) => candidate.id === viewId) ?? views[0]!;
 
   const found = doc.renders[`${view.id}:${theme}`];
-  const rendered = found ? { ok: true as const, ...found } : { ok: false as const, error: `no render for ${view.id}:${theme}` };
+  const rendered = found ? { ok: true as const, ...found } : { ok: false as const, error: `No render for ${view.id} in the ${theme} theme.` };
 
   const flowId = step?.stage?.kind === "flow" ? step.stage.flow : view.scope.kind === "selection" ? view.scope.flows[0] : undefined;
   const focused = rendered.ok && step ? focusBoxes(step, rendered.atlas, flowId) : [];
@@ -77,9 +87,23 @@ export function PrLensPrototype() {
   const fitTo = (box: Box, maxScale: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const pad = 40;
-    const scale = Math.min(maxScale, (rect.width - pad * 2) / box.width, (rect.height - pad * 2) / box.height);
-    setPan({ scale, x: rect.width / 2 - (box.x + box.width / 2) * scale, y: rect.height / 2 - (box.y + box.height / 2) * scale });
+    const right = rect.width > 760 ? FIT_INSET.rightWithPanel : FIT_INSET.right;
+    const width = rect.width - FIT_INSET.left - right;
+    const height = rect.height - FIT_INSET.top - FIT_INSET.bottom;
+    const scale = Math.max(0.1, Math.min(maxScale, width / box.width, height / box.height));
+    setPan({ scale, x: FIT_INSET.left + width / 2 - (box.x + box.width / 2) * scale, y: FIT_INSET.top + height / 2 - (box.y + box.height / 2) * scale });
+  };
+  const fitAll = () => {
+    if (rendered.ok) fitTo({ x: 0, y: 0, width: rendered.width, height: rendered.height }, 1.2);
+  };
+  const zoomAround = (factor: number, px: number, py: number) =>
+    setPan((current) => {
+      const scale = Math.min(4, Math.max(0.1, current.scale * factor));
+      return { scale, x: px - ((px - current.x) * scale) / current.scale, y: py - ((py - current.y) * scale) / current.scale };
+    });
+  const zoomBy = (factor: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) zoomAround(factor, rect.width / 2, rect.height / 2);
   };
   const focusKey = JSON.stringify(focusBox);
   useLayoutEffect(() => {
@@ -118,15 +142,8 @@ export function PrLensPrototype() {
   const onWheel = (event: WheelEvent<HTMLDivElement>) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    if (event.ctrlKey || event.metaKey) {
-      const factor = Math.exp(-event.deltaY * 0.01);
-      setPan((current) => {
-        const scale = Math.min(4, Math.max(0.1, current.scale * factor));
-        const px = event.clientX - rect.left;
-        const py = event.clientY - rect.top;
-        return { scale, x: px - ((px - current.x) * scale) / current.scale, y: py - ((py - current.y) * scale) / current.scale };
-      });
-    } else setPan((current) => ({ ...current, x: current.x - event.deltaX, y: current.y - event.deltaY }));
+    if (event.ctrlKey || event.metaKey) zoomAround(Math.exp(-event.deltaY * 0.01), event.clientX - rect.left, event.clientY - rect.top);
+    else setPan((current) => ({ ...current, x: current.x - event.deltaX, y: current.y - event.deltaY }));
   };
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("[data-target]")) return;
@@ -136,6 +153,9 @@ export function PrLensPrototype() {
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const state = drag.current;
     if (state) setPan((current) => ({ ...current, x: state.vx + event.clientX - state.x, y: state.vy + event.clientY - state.y }));
+  };
+  const endDrag = () => {
+    drag.current = null;
   };
 
   const switchDoc = (name: string) => {
@@ -153,165 +173,208 @@ export function PrLensPrototype() {
       ]
     : [];
   const viewPins = pins.filter((pin) => pin.key === view.id);
+  // Pins and rims keep their on-screen size while the diagram zooms.
+  const counterScale = 1 / pan.scale;
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-4 md:p-6">
-      <div className="rounded-md border border-warning/60 bg-warning/10 px-3 py-2 text-xs">
-        PROTOTYPE for issue #27. Throwaway, not for merge. Fake data from <code>@coldtea/pr-lens-schema/examples</code>.
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <select className="rounded border border-border bg-background px-2 py-1" value={docName} onChange={(event) => switchDoc(event.target.value)}>
-          {Object.keys(DOCS).map((name) => (
-            <option key={name}>{name}</option>
-          ))}
-        </select>
-        <span className="text-muted-foreground">Theme:</span>
-        {(["auto", "light", "dark"] as const).map((option) => (
-          <Button key={option} size="sm" variant={themeOverride === option ? "secondary" : "ghost"} onClick={() => setThemeOverride(option)}>
-            {option}
-          </Button>
-        ))}
-        <label className="flex items-center gap-1">
-          <input type="checkbox" checked={forcePause} onChange={(event) => setForcePause(event.target.checked)} /> simulate reduced motion
-        </label>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1">
-        {views.map((candidate) => (
-          <Button key={candidate.id} size="sm" variant={candidate.id === view.id ? "secondary" : "ghost"} onClick={() => setViewId(candidate.id)}>
-            {candidate.title}
-          </Button>
-        ))}
-        <span className="ml-auto text-xs text-muted-foreground">Click a card to pin · ⌘/Ctrl + scroll to zoom · drag to pan · ←/→ steps</span>
-      </div>
-
-      <div className="flex min-h-[480px] flex-1 gap-3">
-        <div
-          ref={containerRef}
-          className="relative min-w-0 flex-1 cursor-grab select-none overflow-hidden rounded-lg border border-border bg-muted/20 active:cursor-grabbing"
-          onWheel={onWheel}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={() => {
-            drag.current = null;
-          }}
-          onLostPointerCapture={() => {
-            drag.current = null;
-          }}
-        >
-          {rendered.ok ? (
-            <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${pan.scale})`, width: rendered.width, height: rendered.height }}>
-              {/* Renderer output is escaped at its boundary (README: Untrusted text). */}
-              <div ref={svgHostRef} className="[&>svg]:block" dangerouslySetInnerHTML={{ __html: rendered.svg }} />
-              {focusBox ? (
-                <svg className="pointer-events-none absolute left-0 top-0" width={rendered.width} height={rendered.height}>
-                  <path
-                    fillRule="evenodd"
-                    className="fill-background/70 transition-opacity"
-                    d={`M0 0H${rendered.width}V${rendered.height}H0Z ${focused.map((b) => `M${b.x - 6} ${b.y - 6}h${b.width + 12}v${b.height + 12}h${-(b.width + 12)}Z`).join(" ")}`}
-                  />
-                  {focused.map((b, i) => (
-                    <rect key={i} x={b.x - 6} y={b.y - 6} width={b.width + 12} height={b.height + 12} rx={10} className="fill-none stroke-primary" strokeWidth={2} />
-                  ))}
-                </svg>
-              ) : null}
-              {targets.map(({ kind, id, box }) => (
-                <button
-                  key={`${kind}:${id}`}
-                  type="button"
-                  data-target
-                  title={`${kind}: ${id}`}
-                  onClick={() => setSelected({ kind, id })}
-                  className={cn("absolute rounded-md outline-offset-2 hover:outline hover:outline-2 hover:outline-primary/60", selected?.kind === kind && selected.id === id && "outline outline-2 outline-primary")}
-                  style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
+    <div className="relative h-full min-h-0 overflow-hidden">
+      {/* The canvas is the page; every control floats over it. */}
+      <div
+        ref={containerRef}
+        className="absolute inset-0 cursor-grab select-none active:cursor-grabbing"
+        style={{ backgroundColor: rendered.ok ? rendered.background : undefined }}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onLostPointerCapture={endDrag}
+      >
+        {rendered.ok ? (
+          <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${pan.scale})`, width: rendered.width, height: rendered.height }}>
+            {/* Renderer output is escaped at its boundary (README: Untrusted text). */}
+            <div ref={svgHostRef} className="[&>svg]:block" dangerouslySetInnerHTML={{ __html: rendered.svg }} />
+            {focusBox ? (
+              <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={rendered.width} height={rendered.height}>
+                {/* The veil reaches past the drawing so the dim covers the whole canvas. */}
+                <path
+                  fillRule="evenodd"
+                  fill={rendered.background}
+                  fillOpacity={0.75}
+                  d={`M-8000 -8000H${rendered.width + 8000}V${rendered.height + 8000}H-8000Z ${focused.map((b) => `M${b.x - 6} ${b.y - 6}h${b.width + 12}v${b.height + 12}h${-(b.width + 12)}Z`).join(" ")}`}
                 />
-              ))}
-              {viewPins.map((pin, index) => {
-                const box = pin.kind === "node" ? rendered.atlas.nodes[pin.id] : rendered.atlas.tables[pin.id];
-                if (!box) return null;
-                const sameTarget = viewPins.filter((other) => other.id === pin.id).indexOf(pin);
-                return (
-                  <span
-                    key={index}
-                    title={pin.text}
-                    className="pointer-events-none absolute flex size-5 items-center justify-center rounded-full rounded-bl-none bg-primary text-[10px] font-semibold text-primary-foreground shadow"
-                    style={{ left: box.x + box.width - 10 - sameTarget * 14, top: box.y - 10 }}
-                  >
-                    {index + 1}
-                  </span>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="p-4 text-sm text-destructive">{rendered.error}</div>
-          )}
+                {focused.map((b, i) => (
+                  <rect key={i} x={b.x - 6} y={b.y - 6} width={b.width + 12} height={b.height + 12} rx={10} className="fill-none stroke-primary" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+                ))}
+              </svg>
+            ) : null}
+            {targets.map(({ kind, id, box }) => (
+              <button
+                key={`${kind}:${id}`}
+                type="button"
+                data-target
+                aria-label={`Comment on ${kind} ${id}`}
+                aria-pressed={selected?.kind === kind && selected.id === id}
+                onClick={() => setSelected({ kind, id })}
+                className="absolute cursor-pointer rounded-lg outline-offset-4 hover:outline hover:outline-2 hover:outline-primary/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring aria-pressed:outline aria-pressed:outline-2 aria-pressed:outline-primary"
+                style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
+              />
+            ))}
+            {viewPins.map((pin, index) => {
+              const box = pin.kind === "node" ? rendered.atlas.nodes[pin.id] : rendered.atlas.tables[pin.id];
+              if (!box) return null;
+              const sameTarget = viewPins.filter((other) => other.id === pin.id).indexOf(pin);
+              return (
+                <span
+                  key={index}
+                  title={pin.text}
+                  className="pointer-events-none absolute flex size-6 origin-bottom-left items-center justify-center rounded-full rounded-bl-none border-2 border-background bg-foreground text-[11px] font-semibold tabular-nums text-background shadow-md"
+                  style={{ left: box.x + box.width - 4 + sameTarget * 18 * counterScale, top: box.y - 24, transform: `scale(${counterScale})` }}
+                >
+                  {index + 1}
+                </span>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex h-full items-center justify-center p-6 text-sm text-destructive">{rendered.error}</div>
+        )}
+      </div>
+
+      <div className="pointer-events-none absolute inset-3 flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <div className={cn(PANEL, "flex min-w-0 flex-wrap items-center gap-1 p-1")}>
+            {DOC_NAMES.map((name) => (
+              <Button key={name} size="sm" variant="ghost" aria-pressed={name === docName} onClick={() => switchDoc(name)}>
+                {name.split(" ")[0]}
+              </Button>
+            ))}
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+            {views.map((candidate) => (
+              <Button key={candidate.id} size="sm" variant="ghost" aria-pressed={candidate.id === view.id} onClick={() => setViewId(candidate.id)}>
+                {candidate.title}
+              </Button>
+            ))}
+          </div>
+          <div className={cn(PANEL, "ml-auto flex shrink-0 items-center gap-1 p-1")}>
+            <span
+              className="rounded-full border border-warning/60 bg-warning/10 px-2 py-0.5 text-[11px] font-medium text-warning-text"
+              title="Issue #27. Throwaway, not for merge. Example data from @coldtea/pr-lens-schema."
+            >
+              Prototype
+            </span>
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden />
+            {(["auto", "light", "dark"] as const).map((option) => (
+              <Button key={option} size="sm" variant="ghost" className="capitalize" aria-pressed={themeOverride === option} onClick={() => setThemeOverride(option)}>
+                {option}
+              </Button>
+            ))}
+            <Button size="sm" variant="ghost" aria-pressed={forcePause} onClick={() => setForcePause(!forcePause)}>
+              <Icon name="Pause" />
+              Reduced motion
+            </Button>
+          </div>
         </div>
 
-        <aside className="w-72 shrink-0 space-y-3 overflow-y-auto text-sm">
-          <section>
-            <div className="mb-1 flex items-center gap-2">
-              <h2 className="font-semibold">Walkthrough</h2>
-              <Button size="sm" variant={stepIndex === null ? "secondary" : "ghost"} onClick={() => goTo(null)}>
+        <div className="flex min-h-0 flex-1 items-start justify-end">
+          <aside className={cn(PANEL, "flex max-h-full w-80 flex-col overflow-hidden text-sm")}>
+            <div className="flex items-center gap-2 border-b border-border py-1.5 pl-3 pr-1.5">
+              <h2 className="text-[15px] font-semibold leading-[22px]">Walkthrough</h2>
+              <span className="text-[11px] tabular-nums text-muted-foreground">{stepIndex === null ? `${steps.length} steps` : `${stepIndex + 1} of ${steps.length}`}</span>
+              <Button size="sm" variant="ghost" className="ml-auto h-7 px-2" aria-pressed={stepIndex === null} onClick={() => goTo(null)}>
                 All
               </Button>
             </div>
-            {steps.length === 0 ? <p className="text-xs text-muted-foreground">This document has no walkthrough.</p> : null}
-            <ol className="space-y-1">
-              {steps.map((candidate, index) => (
-                <li key={candidate.id}>
-                  <button type="button" onClick={() => goTo(index)} className={cn("flex w-full gap-2 rounded-md p-2 text-left hover:bg-state-hover", index === stepIndex && "bg-state-hover")}>
-                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full border border-border text-[11px]">{index + 1}</span>
-                    <span className="min-w-0">
-                      <span className="block font-medium">{candidate.heading}</span>
-                      <span className="block text-xs text-muted-foreground">{candidate.body}</span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          {selected ? (
-            <section className="space-y-1">
-              <h2 className="font-semibold">Comment on {selected.kind} <code>{selected.id}</code></h2>
+            <div className="min-h-0 overflow-y-auto p-1">
+              {steps.length === 0 ? <p className="px-2 py-3 text-xs text-muted-foreground">This document has no walkthrough.</p> : null}
+              <ol>
+                {steps.map((candidate, index) => (
+                  <li key={candidate.id}>
+                    <button
+                      type="button"
+                      aria-current={index === stepIndex ? "step" : undefined}
+                      onClick={() => goTo(index)}
+                      className="group flex w-full gap-2.5 rounded-md px-2 py-2 text-left transition-colors duration-150 hover:bg-state-hover hover:duration-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring aria-[current=step]:bg-state-active"
+                    >
+                      <span className="mt-px flex size-5 shrink-0 items-center justify-center rounded-full border border-border text-[11px] font-medium tabular-nums text-muted-foreground group-aria-[current=step]:border-foreground group-aria-[current=step]:bg-foreground group-aria-[current=step]:text-background">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block font-medium">{candidate.heading}</span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">{candidate.body}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            {selected ? (
               <form
+                className="space-y-2 border-t border-border p-3"
                 onSubmit={(event) => {
                   event.preventDefault();
-                  const text = new FormData(event.currentTarget).get("text")?.toString() ?? "";
-                  setPins((current) => [...current, { key: view.id, ...selected, text: text || "(empty)" }]);
+                  const text = new FormData(event.currentTarget).get("text")?.toString().trim() ?? "";
+                  if (!text) return;
+                  setPins((current) => [...current, { key: view.id, ...selected, text }]);
                   event.currentTarget.reset();
                 }}
               >
-                <input name="text" className="w-full rounded border border-border bg-background px-2 py-1 text-xs" placeholder="Design comment" />
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="shrink-0">Comment on {selected.kind}</span>
+                  <code className="min-w-0 truncate font-mono text-foreground">{selected.id}</code>
+                  <Button type="button" size="icon" variant="ghost" className="ml-auto size-6 shrink-0" aria-label="Close comment" onClick={() => setSelected(null)}>
+                    <Icon name="X" />
+                  </Button>
+                </div>
+                <Input name="text" aria-label="Design comment" autoFocus placeholder="Design comment, Enter to pin" />
               </form>
-            </section>
-          ) : null}
+            ) : null}
+          </aside>
+        </div>
 
-          <section className="space-y-1 text-xs">
-            <h2 className="font-semibold text-sm">State</h2>
-            <pre className="whitespace-pre-wrap rounded bg-muted/40 p-2 text-[11px]">
-              {JSON.stringify(
-                {
-                  view: view.id,
-                  lens: view.lens,
-                  theme,
-                  bbThemeMode: codeTheme.mode,
-                  size: rendered.ok ? [rendered.width, rendered.height] : null,
-                  animated: rendered.ok ? rendered.animated : null,
-                  prefersReducedMotion,
-                  animationsPaused: paused,
-                  step: step?.id ?? "All",
-                  focusedBoxes: focused.length,
-                  zoom: Number(pan.scale.toFixed(2)),
-                  pins: viewPins.length,
-                },
-                null,
-                1,
-              )}
-            </pre>
-          </section>
-        </aside>
+        <div className="flex items-end gap-3">
+          <div className="flex min-w-0 flex-col items-start gap-2">
+            {showState ? (
+              <pre className={cn(PANEL, "max-w-xs whitespace-pre-wrap p-2 font-mono text-[11px] text-muted-foreground")}>
+                {JSON.stringify(
+                  {
+                    view: view.id,
+                    lens: view.lens,
+                    theme,
+                    bbThemeMode: codeTheme.mode,
+                    size: rendered.ok ? [rendered.width, rendered.height] : null,
+                    animated: rendered.ok ? rendered.animated : null,
+                    prefersReducedMotion,
+                    animationsPaused: paused,
+                    step: step?.id ?? "All",
+                    focusedBoxes: focused.length,
+                    zoom: Number(pan.scale.toFixed(2)),
+                    pins: viewPins.length,
+                  },
+                  null,
+                  1,
+                )}
+              </pre>
+            ) : null}
+            <div className={cn(PANEL, "flex min-w-0 items-center gap-1 p-1")}>
+              <Button size="sm" variant="ghost" className="h-7 px-2" aria-pressed={showState} onClick={() => setShowState(!showState)}>
+                State
+              </Button>
+              <span className="truncate px-2 text-[11px] text-muted-foreground">Click a card to comment · drag to pan · ⌘/Ctrl + scroll to zoom · ←/→ steps</span>
+            </div>
+          </div>
+          <div className={cn(PANEL, "ml-auto flex shrink-0 items-center gap-1 p-1")}>
+            <Button size="icon" variant="ghost" className="size-7" onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out">
+              <Icon name="Minus" />
+            </Button>
+            <span className="w-11 text-center text-xs tabular-nums text-muted-foreground">{Math.round(pan.scale * 100)}%</span>
+            <Button size="icon" variant="ghost" className="size-7" onClick={() => zoomBy(1.2)} aria-label="Zoom in">
+              <Icon name="Plus" />
+            </Button>
+            <Button size="icon" variant="ghost" className="size-7" onClick={fitAll} aria-label="Fit to view">
+              <Icon name="Maximize2" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

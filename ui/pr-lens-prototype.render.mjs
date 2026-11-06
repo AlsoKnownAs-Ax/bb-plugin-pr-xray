@@ -2,7 +2,7 @@
 // the app bundle. Render on Node (as the server would) and ship SVG + atlas.
 // Run: node ui/pr-lens-prototype.render.mjs
 import { writeFileSync } from "node:fs";
-import { flattenViews, render } from "@coldtea/pr-lens-renderer";
+import { flattenViews, paletteFor, render } from "@coldtea/pr-lens-renderer";
 import { billingOrgGraph, postmarkRefactorGraph } from "@coldtea/pr-lens-schema/examples";
 
 const docs = {
@@ -16,7 +16,7 @@ for (const [name, doc] of Object.entries(docs)) {
   for (const view of views)
     for (const theme of ["light", "dark"]) {
       const { svg, width, height, animated, atlas } = render(doc, { lens: view.lens, theme, view: view.id });
-      renders[`${view.id}:${theme}`] = { svg, width, height, animated, atlas };
+      renders[`${view.id}:${theme}`] = { svg, width, height, animated, atlas, background: paletteFor(theme).background };
     }
   out[name] = { views, walkthrough: doc.walkthrough?.steps ?? [], renders };
 }
