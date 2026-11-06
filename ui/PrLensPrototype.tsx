@@ -66,6 +66,8 @@ export function PrLensPrototype() {
   const [stepIndex, setStepIndex] = useState<number | null>(null);
   const [pins, setPins] = useState<Pin[]>([]);
   const [showState, setShowState] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [fullscreen, setFullscreen] = useState(false);
   const [selected, setSelected] = useState<{ kind: "node" | "table"; id: string } | null>(null);
   const theme = themeOverride === "auto" ? codeTheme.mode : themeOverride;
   const steps = doc.walkthrough;
@@ -110,7 +112,18 @@ export function PrLensPrototype() {
     if (!rendered.ok) return;
     fitTo(focusBox ?? { x: 0, y: 0, width: rendered.width, height: rendered.height }, focusBox ? 1.6 : 1.2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [found, focusKey]);
+  }, [found, focusKey, fullscreen]);
+
+  // Refit when the panel enters or leaves fullscreen, since its size jumps.
+  useEffect(() => {
+    const onChange = () => setFullscreen(document.fullscreenElement === rootRef.current);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) void document.exitFullscreen();
+    else void rootRef.current?.requestFullscreen().catch(() => {});
+  };
 
   // Q4: SMIL pulses must stop under reduced motion.
   const [paused, setPaused] = useState<boolean | null>(null);
@@ -177,7 +190,7 @@ export function PrLensPrototype() {
   const counterScale = 1 / pan.scale;
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden">
+    <div ref={rootRef} className="relative h-full min-h-0 overflow-hidden bg-background">
       {/* The canvas is the page; every control floats over it. */}
       <div
         ref={containerRef}
@@ -359,19 +372,21 @@ export function PrLensPrototype() {
               <Button size="sm" variant="ghost" className="h-7 px-2" aria-pressed={showState} onClick={() => setShowState(!showState)}>
                 State
               </Button>
-              <span className="truncate px-2 text-[11px] text-muted-foreground">Click a card to comment · drag to pan · ⌘/Ctrl + scroll to zoom · ←/→ steps</span>
+              <span className="truncate px-2 text-[11px] text-muted-foreground">Click a card to comment · drag to pan · ⌘/Ctrl + scroll to zoom · click % to fit · ←/→ steps</span>
             </div>
           </div>
           <div className={cn(PANEL, "ml-auto flex shrink-0 items-center gap-1 p-1")}>
             <Button size="icon" variant="ghost" className="size-7" onClick={() => zoomBy(1 / 1.2)} aria-label="Zoom out">
               <Icon name="Minus" />
             </Button>
-            <span className="w-11 text-center text-xs tabular-nums text-muted-foreground">{Math.round(pan.scale * 100)}%</span>
+            <Button size="sm" variant="ghost" className="h-7 w-12 px-0 text-xs tabular-nums text-muted-foreground" onClick={fitAll} aria-label="Fit to view">
+              {Math.round(pan.scale * 100)}%
+            </Button>
             <Button size="icon" variant="ghost" className="size-7" onClick={() => zoomBy(1.2)} aria-label="Zoom in">
               <Icon name="Plus" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-7" onClick={fitAll} aria-label="Fit to view">
-              <Icon name="Maximize2" />
+            <Button size="icon" variant="ghost" className="size-7" onClick={toggleFullscreen} aria-label={fullscreen ? "Exit full screen" : "Full screen"} aria-pressed={fullscreen}>
+              <Icon name={fullscreen ? "Minimize2" : "Maximize2"} fallback="Maximize2" />
             </Button>
           </div>
         </div>
