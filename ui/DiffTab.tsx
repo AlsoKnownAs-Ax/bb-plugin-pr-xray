@@ -70,7 +70,6 @@ export function DiffTab({
   activeGroupId,
   onActiveGroupChange,
   scrollRequest,
-  onShowInDiagram,
 }: {
   data: ReviewGet;
   rpc: Rpc;
@@ -83,7 +82,6 @@ export function DiffTab({
   activeGroupId: string | null;
   onActiveGroupChange: (groupId: string) => void;
   scrollRequest: { groupId: string; nonce: number } | null;
-  onShowInDiagram: ((groupId: string) => void) | null;
 }) {
   const { pr } = data;
   const navigate = useBbNavigate();
@@ -503,12 +501,6 @@ export function DiffTab({
                   </button>
                   <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{KIND_LABEL[group.kind]}</span>
                   <div className="ml-auto flex items-center gap-2">
-                    {onShowInDiagram ? (
-                      <Button size="sm" variant="ghost" onClick={() => onShowInDiagram(group.id)}>
-                        <Icon name="Workflow" />
-                        Show in diagram
-                      </Button>
-                    ) : null}
                     <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Checkbox checked={viewed.has(group.id)} onCheckedChange={(checked) => setGroupViewed(group, checked === true)} />
                       Viewed

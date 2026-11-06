@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PendingComment } from "../shared/schema";
+import { billingOrgGraph } from "@coldtea/pr-lens-schema/examples";
+import type { PendingComment, StoredComment } from "../shared/schema";
 import { createComments, stripMarker } from "./comments";
 
 describe("comment tag markers", () => {
@@ -138,5 +139,57 @@ describe("submitting a review", () => {
     github.submitReview.mockRejectedValueOnce(new Error("422"));
     await expect(comments.submitReview(ref, "head", "COMMENT", "")).rejects.toThrow("422");
     expect(rows.current.map((row) => row.id)).toEqual(["a"]);
+  });
+});
+
+describe("diagram comments", () => {
+  const ref = { owner: "acme", repo: "web", number: 7 };
+  const pin = (id: string, diagramId: string, nodeId: string, status = "open") =>
+    ({ id, source: "diagram", ref, diagramId, nodeId, status }) as unknown as StoredComment;
+
+  function setup(pins: StoredComment[]) {
+    const store = {
+      analysis: () => ({ id: "an_2", ref, headSha: "head", result: { graph: billingOrgGraph } }),
+      commentsForPr: () => pins,
+      updateComment: vi.fn(),
+      insertComment: vi.fn((input: object) => input),
+    };
+    const bb = { realtime: { publish: vi.fn() }, agents: { registerTool: vi.fn() }, events: { on: vi.fn() } };
+    const comments = createComments({ bb, store, github: {}, models: {} } as unknown as Parameters<typeof createComments>[0]);
+    return { comments, store };
+  }
+
+  it("marks pins on nodes and tables gone after a re-run outdated, and keeps the rest open", () => {
+    const { comments, store } = setup([
+      pin("node-kept", "architecture-overview", "billing-service"),
+      pin("node-gone", "architecture-overview", "payment-gateway"),
+      pin("table-kept", "data-model", "subscription", "outdated"),
+      pin("table-gone", "data-model", "plan"),
+      pin("resolved", "data-model", "plan", "resolved"),
+    ]);
+    comments.reconcileDiagramPins("an_2");
+    expect(store.updateComment.mock.calls).toEqual([
+      ["node-gone", { status: "outdated" }],
+      ["table-kept", { status: "open" }],
+      ["table-gone", { status: "outdated" }],
+    ]);
+  });
+
+  it("pins a comment to a table with its label from the document", () => {
+    const { comments, store } = setup([]);
+    comments.addDiagramComment({ ref, analysisId: "an_2", diagramId: "data-model", nodeId: "subscription", body: "Split this." });
+    expect(store.insertComment).toHaveBeenCalledWith(
+      expect.objectContaining({ headSha: "head", diagramId: "data-model", nodeId: "subscription", nodeLabel: "Subscription" }),
+    );
+  });
+
+  it("rejects ids that are not in the document", () => {
+    const { comments, store } = setup([]);
+    const add = (diagramId: string, nodeId: string) => () =>
+      comments.addDiagramComment({ ref, analysisId: "an_2", diagramId, nodeId, body: "Hm." });
+    expect(add("data-model", "plan")).toThrow("That diagram node no longer exists.");
+    expect(add("architecture-overview", "subscription")).toThrow("That diagram node no longer exists.");
+    expect(add("nope", "billing-service")).toThrow("That diagram node no longer exists.");
+    expect(store.insertComment).not.toHaveBeenCalled();
   });
 });

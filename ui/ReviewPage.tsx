@@ -64,7 +64,6 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
   const [view, setView] = useState<ViewMode>(() => (localStorage.getItem("pr-xray:view") as ViewMode) ?? "unified");
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [scrollRequest, setScrollRequest] = useState<{ groupId: string; nonce: number } | null>(null);
-  const [diagramFocus, setDiagramFocus] = useState<{ groupId: string; nonce: number } | null>(null);
   const [localViewed, setLocalViewed] = useState<Map<string, boolean>>(new Map());
   const [chatRequest, setChatRequest] = useState<{ threadId: string; nonce: number } | null>(null);
   const [editingTicket, setEditingTicket] = useState(false);
@@ -169,8 +168,6 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
   const running = current?.status === "running";
   const failed = current?.status === "failed";
   const stale = analysis !== null && analysis.headSha !== pr.headSha;
-  const groupHasDiagram = (groupId: string) =>
-    analysis?.result?.diagrams.some((diagram) => diagram.nodes.some((node) => node.groupIds.includes(groupId))) ?? false;
 
   return (
     <FocusFrame focus={focus}>
@@ -287,18 +284,6 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             activeGroupId={activeGroupId}
             onActiveGroupChange={setActiveGroupId}
             scrollRequest={scrollRequest}
-            onShowInDiagram={
-              analysis?.result
-                ? (groupId) => {
-                    if (!groupHasDiagram(groupId)) {
-                      toast("No diagram node is linked to this group");
-                      return;
-                    }
-                    setDiagramFocus({ groupId, nonce: Date.now() });
-                    setTab("explain");
-                  }
-                : null
-            }
           />
         ) : analysis?.result ? (
           <ExplainTab
@@ -306,7 +291,6 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             analysis={analysis}
             rpc={rpc}
             groups={groups}
-            focusGroupId={diagramFocus}
             onOpenGroup={(groupId) => {
               setTab("diff");
               setScrollRequest({ groupId, nonce: Date.now() });
@@ -319,10 +303,12 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
           </div>
         ) : (
           <div className="flex flex-col items-start gap-3 p-6 text-sm text-muted-foreground">
-            No analysis yet. Analyse the PR to get a summary, walkthrough and diagrams.
+            {analysis?.legacy
+              ? "Re-run analysis to see the new diagrams."
+              : "No analysis yet. Analyse the PR to get a summary, walkthrough and diagrams."}
             <Button size="sm" variant="outline" onClick={() => void reanalyse()}>
               <Icon name="Sparkles" />
-              Analyse
+              {analysis?.legacy ? "Re-run analysis" : "Analyse"}
             </Button>
           </div>
         )}

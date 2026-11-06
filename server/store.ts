@@ -126,6 +126,7 @@ function toAnalysis(row: AnalysisRow): AnalysisRecord {
     status: row.status,
     error: row.error,
     result,
+    legacy: row.result_json !== null && result === null,
     hunkFingerprints: row.hunk_fingerprints === null ? null : (JSON.parse(row.hunk_fingerprints) as Record<string, string>),
     workerThreadId: row.worker_thread_id,
     diffOnly: row.diff_only === 1,

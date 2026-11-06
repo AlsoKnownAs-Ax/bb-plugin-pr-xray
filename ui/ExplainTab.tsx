@@ -1,13 +1,14 @@
-// The visual explanation: narrative, diagrams with pinned design comments,
-// and what to look at closely.
+// The visual explanation: PR Lens diagrams with pinned design comments, and
+// what to look at closely.
 import { useMemo, useState } from "react";
-import { useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { experimental_useCodeTheme as useCodeTheme, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
-import type { AnalysisRecord, DiagramNode, ReviewGroup, StoredComment } from "../shared/schema";
-import { Composer, TagChip } from "./comments";
+import { diagramTabs } from "../shared/diagram-tabs";
+import type { AnalysisRecord, ReviewGroup, StoredComment } from "../shared/schema";
+import { TagChip } from "./comments";
 import { DiagramCanvas } from "./DiagramCanvas";
 import { useAgentConfirmContext } from "./agent-confirm";
 import { SafeMarkdown } from "./SafeMarkdown";
@@ -25,34 +26,22 @@ export function ExplainTab({
   rpc,
   groups,
   onOpenGroup,
-  focusGroupId,
 }: {
   data: ReviewGet;
   analysis: AnalysisRecord;
   rpc: Rpc;
   groups: ReviewGroup[];
   onOpenGroup: (groupId: string) => void;
-  /** Group to highlight in the diagrams ("Show in diagram"). */
-  focusGroupId: { groupId: string; nonce: number } | null;
 }) {
   const result = analysis.result!;
   const navigate = useBbNavigate();
+  const theme = useCodeTheme().mode;
   const groupTitles = useMemo(() => new Map(groups.map((group) => [group.id, group.title])), [groups]);
-  const initialDiagram =
-    (focusGroupId && result.diagrams.find((diagram) => diagram.nodes.some((node) => node.groupIds.includes(focusGroupId.groupId)))?.id) ??
-    result.diagrams[0]!.id;
-  const [diagramId, setDiagramId] = useState(initialDiagram);
-  const diagram = result.diagrams.find((candidate) => candidate.id === diagramId) ?? result.diagrams[0]!;
-  const [selected, setSelected] = useState<DiagramNode | null>(null);
+  const tabs = useMemo(() => diagramTabs(result.graph), [result.graph]);
+  const [tabId, setTabId] = useState(tabs[0]!.id);
+  const tab = tabs.find((candidate) => candidate.id === tabId) ?? tabs[0]!;
+  const render = result.renders[tab.id]?.[theme];
   const diagramComments = data.comments.filter((comment) => comment.source === "diagram");
-  const highlight = useMemo(
-    () =>
-      new Set(
-        focusGroupId ? diagram.nodes.filter((node) => node.groupIds.includes(focusGroupId.groupId)).map((node) => node.id) : [],
-      ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [focusGroupId?.nonce, diagram],
-  );
 
   const { confirmAgent } = useAgentConfirmContext();
   const fixAll = async () => {
@@ -90,6 +79,9 @@ export function ExplainTab({
   const open = diagramComments.filter((comment) => comment.status === "open");
   const outdated = diagramComments.filter((comment) => comment.status === "outdated");
   const resolved = diagramComments.filter((comment) => comment.status === "resolved");
+  const selectComment = (comment: StoredComment) => {
+    if (tabs.some((candidate) => candidate.id === comment.diagramId)) setTabId(comment.diagramId!);
+  };
 
   return (
     <div className="flex h-full min-h-0">
@@ -113,49 +105,17 @@ export function ExplainTab({
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-base font-semibold">Diagrams</h2>
               <div className="flex flex-wrap gap-1">
-                {result.diagrams.map((candidate) => (
-                  <Button
-                    key={candidate.id}
-                    size="sm"
-                    variant="ghost"
-                    aria-pressed={candidate.id === diagram.id}
-                    onClick={() => {
-                      setDiagramId(candidate.id);
-                      setSelected(null);
-                    }}
-                  >
+                {tabs.map((candidate) => (
+                  <Button key={candidate.id} size="sm" variant="ghost" aria-pressed={candidate.id === tab.id} onClick={() => setTabId(candidate.id)}>
                     {candidate.title}
                   </Button>
                 ))}
               </div>
-              <span className="ml-auto text-xs text-muted-foreground">Click a node to comment · ⌘/Ctrl + scroll to zoom · drag to pan</span>
+              <span className="ml-auto text-xs text-muted-foreground">⌘/Ctrl + scroll to zoom · drag to pan</span>
             </div>
-            {diagram.description ? <SafeMarkdown content={diagram.description} className="text-sm text-muted-foreground" /> : null}
-            <div className="h-[60vh]">
-              <DiagramCanvas
-                diagram={diagram}
-                comments={diagramComments}
-                selectedNodeId={selected?.id ?? null}
-                highlightNodeIds={highlight}
-                onSelectNode={setSelected}
-              />
+            <div className="relative h-[60vh] overflow-hidden rounded-lg border border-border">
+              {render ? <DiagramCanvas key={tab.id} render={render} /> : null}
             </div>
-          </section>
-
-          <section className="space-y-3">
-            <h2 className="text-base font-semibold">Walkthrough</h2>
-            <ol className="space-y-4">
-              {result.narrative.map((step, index) => (
-                <li key={index} className="flex gap-3">
-                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-border text-xs">{index + 1}</span>
-                  <div className="min-w-0">
-                    <div className="font-medium">{step.title}</div>
-                    <SafeMarkdown content={step.body} className="text-sm" />
-                    <GroupLinks ids={step.groupIds} />
-                  </div>
-                </li>
-              ))}
-            </ol>
           </section>
 
           {result.lookClosely.length > 0 ? (
@@ -179,52 +139,28 @@ export function ExplainTab({
       </div>
 
       <aside className="flex w-80 shrink-0 flex-col border-l border-border">
-        {selected ? (
-          <NodePanel
-            key={`${diagram.id}/${selected.id}`}
-            data={data}
-            analysis={analysis}
-            diagramId={diagram.id}
-            node={selected}
-            comments={diagramComments.filter((comment) => comment.diagramId === diagram.id && comment.nodeId === selected.id)}
-            rpc={rpc}
-            groupLinks={<GroupLinks ids={selected.groupIds} />}
-            onClose={() => setSelected(null)}
-          />
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b border-border p-3">
-              <div className="text-sm font-medium">Design comments</div>
-              <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
-            </div>
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-              {diagramComments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No design comments yet. Click a node in the diagram to add one.</p>
-              ) : null}
-              <CommentList title="Open" comments={open} rpc={rpc} onSelect={(comment) => selectComment(comment)} />
-              <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
-              <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={(comment) => selectComment(comment)} />
-            </div>
-            {/* The right padding keeps this clear of the floating chat button. */}
-            <div className="border-t border-border p-3 pr-20">
-              <Button className="w-full" size="sm" disabled={open.length === 0} onClick={() => void fixAll()}>
-                <Icon name="Bot" />
-                Fix all diagram comments{open.length ? ` (${open.length})` : ""}
-              </Button>
-            </div>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="border-b border-border p-3">
+            <div className="text-sm font-medium">Design comments</div>
+            <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
           </div>
-        )}
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+            {diagramComments.length === 0 ? <p className="text-sm text-muted-foreground">No design comments yet.</p> : null}
+            <CommentList title="Open" comments={open} rpc={rpc} onSelect={selectComment} />
+            <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
+            <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={selectComment} />
+          </div>
+          {/* The right padding keeps this clear of the floating chat button. */}
+          <div className="border-t border-border p-3 pr-20">
+            <Button className="w-full" size="sm" disabled={open.length === 0} onClick={() => void fixAll()}>
+              <Icon name="Bot" />
+              Fix all diagram comments{open.length ? ` (${open.length})` : ""}
+            </Button>
+          </div>
+        </div>
       </aside>
     </div>
   );
-
-  function selectComment(comment: StoredComment) {
-    const target = result.diagrams.find((candidate) => candidate.id === comment.diagramId);
-    const node = target?.nodes.find((candidate) => candidate.id === comment.nodeId);
-    if (!target || !node) return;
-    setDiagramId(target.id);
-    setSelected(node);
-  }
 }
 
 function CommentList({
@@ -291,67 +227,6 @@ function DiagramCommentCard({ comment, rpc, onSelect }: { comment: StoredComment
             Delete
           </Button>
         )}
-      </div>
-    </div>
-  );
-}
-
-function NodePanel({
-  data,
-  analysis,
-  diagramId,
-  node,
-  comments,
-  rpc,
-  groupLinks,
-  onClose,
-}: {
-  data: ReviewGet;
-  analysis: AnalysisRecord;
-  diagramId: string;
-  node: DiagramNode;
-  comments: StoredComment[];
-  rpc: Rpc;
-  groupLinks: React.ReactNode;
-  onClose: () => void;
-}) {
-  const isCurrent = analysis.headSha === data.pr.headSha;
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-start gap-2 border-b border-border p-3">
-        <div className="min-w-0 flex-1">
-          <div className="text-[11px] uppercase text-muted-foreground">
-            {node.kind} · {node.status}
-          </div>
-          <div className="font-medium">{node.label}</div>
-          {node.detail ? <p className="mt-1 text-sm text-muted-foreground">{node.detail}</p> : null}
-          {groupLinks}
-        </div>
-        <Button size="icon" variant="ghost" className="size-7" onClick={onClose} aria-label="Close">
-          <Icon name="X" />
-        </Button>
-      </div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-        {comments.map((comment) => (
-          <DiagramCommentCard key={comment.id} comment={comment} rpc={rpc} />
-        ))}
-        <Composer
-          key={comments.length}
-          placeholder="What is wrong with this part of the design?"
-          autoFocus={comments.length === 0}
-          actions={[
-            {
-              label: "Comment",
-              primary: true,
-              run: async (body) => {
-                await rpc.call("diagram.addComment", { ref: data.pr.ref, analysisId: analysis.id, diagramId, nodeId: node.id, body });
-              },
-            },
-          ]}
-        />
-        {!isCurrent ? (
-          <p className="text-[11px] text-muted-foreground">This diagram is from an older commit; re-analyse to comment on the latest design.</p>
-        ) : null}
       </div>
     </div>
   );

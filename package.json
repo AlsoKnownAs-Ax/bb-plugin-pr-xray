@@ -23,7 +23,8 @@
     "app": "./app.tsx"
   },
   "dependencies": {
-    "@dagrejs/dagre": "^3.1.1",
+    "@coldtea/pr-lens-renderer": "0.4.1",
+    "@coldtea/pr-lens-schema": "0.9.0",
     "@radix-ui/react-checkbox": "^1.3.7",
     "@radix-ui/react-slot": "^1.3.0",
     "zod": "^4.6.5"
