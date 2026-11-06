@@ -13,12 +13,14 @@ const STATUS_CLASS: Record<string, string> = { A: "text-success", D: "text-destr
 /** The File tree: the PR's changed files by directory. Clicking a file opens it in the diff. */
 export function FileTree({
   files,
+  groupsOfPath,
   onOpen,
   viewed,
   activePath,
 }: {
   files: PrFile[];
-  onOpen: (path: string) => void;
+  groupsOfPath: Map<string, number[]>;
+  onOpen: OnOpen;
   /** Paths whose every hunk is viewed. */
   viewed: Set<string>;
   /** The file on screen in the diff. */
@@ -35,17 +37,36 @@ export function FileTree({
     });
   return (
     <div className="font-mono">
-      <Rows nodes={tree} closed={closed} onToggle={toggle} onOpen={onOpen} viewed={viewed} activePath={activePath} />
+      <Rows nodes={tree} closed={closed} onToggle={toggle} groupsOfPath={groupsOfPath} onOpen={onOpen} viewed={viewed} activePath={activePath} />
     </div>
   );
 }
 
-type FileProps = { onOpen: (path: string) => void; viewed: Set<string>; activePath: string | null };
-type RowsProps = FileProps & { closed: Set<string>; onToggle: (path: string) => void };
+/** `groupNumber` is the 1-based reading-path position to jump to; without it, the file's first appearance. */
+type OnOpen = (path: string, groupNumber?: number) => void;
+type RowsProps = {
+  closed: Set<string>;
+  onToggle: (path: string) => void;
+  groupsOfPath: Map<string, number[]>;
+  onOpen: OnOpen;
+  viewed: Set<string>;
+  activePath: string | null;
+};
 
 function Rows({ nodes, ...props }: RowsProps & { nodes: FileTreeNode[] }) {
   return nodes.map((node) =>
-    node.kind === "dir" ? <DirRow key={`d:${node.path}`} node={node} {...props} /> : <FileRow key={node.file.path} node={node} {...props} />,
+    node.kind === "dir" ? (
+      <DirRow key={`d:${node.path}`} node={node} {...props} />
+    ) : (
+      <FileRow
+        key={node.file.path}
+        node={node}
+        groups={props.groupsOfPath.get(node.file.path) ?? []}
+        onOpen={props.onOpen}
+        viewed={props.viewed.has(node.file.path)}
+        active={props.activePath === node.file.path}
+      />
+    ),
   );
 }
 
@@ -70,26 +91,41 @@ function DirRow({ node, ...props }: RowsProps & { node: FileTreeDir }) {
   );
 }
 
-function FileRow({ node, onOpen, viewed, activePath }: FileProps & { node: FileTreeFile }) {
+function FileRow({ node, groups, onOpen, viewed, active }: { node: FileTreeFile; groups: number[]; onOpen: OnOpen; viewed: boolean; active: boolean }) {
   const { file } = node;
   const status = fileStatus(file);
-  const isViewed = viewed.has(file.path);
-  const active = activePath === file.path;
+  // A div, not a button, so the group chips can be buttons of their own.
   return (
-    <button
-      type="button"
-      title={fileTooltip(file)}
-      aria-current={active ? "location" : undefined}
-      onClick={() => onOpen(file.path)}
-      className={cn(ROW, "pl-1.5", FOCUS, active && "bg-state-active", isViewed && "text-muted-foreground")}
-    >
-      <span className="min-w-0 flex-1 truncate">{node.name}</span>
-      {isViewed ? <Icon name="Check" aria-label="Viewed" className="size-3 shrink-0" /> : null}
-      <Counts additions={file.additions} deletions={file.deletions} quiet={isViewed} />
+    <div className={cn(ROW, "pl-1.5", active && "bg-state-active", viewed && "text-muted-foreground")}>
+      <button
+        type="button"
+        title={fileTooltip(file)}
+        aria-current={active ? "location" : undefined}
+        onClick={() => onOpen(file.path)}
+        className={cn("min-w-0 flex-1 truncate rounded-sm text-left", FOCUS)}
+      >
+        {node.name}
+      </button>
+      {groups.length > 1
+        ? groups.map((n) => (
+            <button
+              key={n}
+              type="button"
+              title={`Jump to group ${n}`}
+              aria-label={`Jump to ${file.path} in group ${n}`}
+              onClick={() => onOpen(file.path, n)}
+              className={cn("h-4 shrink-0 rounded-full border border-border px-1.5 text-[10px] leading-none tabular-nums text-muted-foreground hover:bg-state-hover hover:text-foreground", CONTROL_HOVER_TRANSITION, FOCUS)}
+            >
+              {n}
+            </button>
+          ))
+        : null}
+      {viewed ? <Icon name="Check" aria-label="Viewed" className="size-3 shrink-0" /> : null}
+      <Counts additions={file.additions} deletions={file.deletions} quiet={viewed} />
       <span title={status.label} aria-label={status.label} className={cn("w-2.5 shrink-0 text-center text-[10px] font-semibold", STATUS_CLASS[status.letter] ?? "text-muted-foreground")}>
         {status.letter}
       </span>
-    </button>
+    </div>
   );
 }
 
