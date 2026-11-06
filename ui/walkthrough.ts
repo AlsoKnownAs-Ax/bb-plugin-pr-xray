@@ -66,17 +66,28 @@ function findView(views: View[], id: string): View | undefined {
   return undefined;
 }
 
-/** The bounding box of the focused elements on a render, or null for "all" or when none is drawn there. `flow` is the flow the render draws. */
-export function focusBox(focus: Focus, atlas: RenderAtlas, flow?: string): Box | null {
-  if (focus.kind === "all") return null;
-  const boxes = [
+/** The boxes of the focused elements on a render; none for "all" or when none is drawn there. `flow` is the flow the render draws. */
+export function focusBoxes(focus: Focus, atlas: RenderAtlas, flow?: string): Box[] {
+  if (focus.kind === "all") {
+    return [];
+  }
+
+  return [
     ...focus.lanes.map((id) => atlas.lanes[id]),
     ...focus.nodes.map((id) => atlas.nodes[id]),
     ...focus.edges.map((id) => atlas.edges[id]),
     ...focus.tables.map((id) => atlas.tables[id]),
-    ...focus.messages.map((id) => (flow ? atlas.messages[flow]?.[id] : undefined)),
+    // No flow, no flow steps: no messages are keyed under "".
+    ...focus.messages.map((id) => atlas.messages[flow ?? ""]?.[id]),
   ].filter((found) => found !== undefined);
-  if (boxes.length === 0) return null;
+}
+
+/** The box round all of `boxes`, to zoom to; null when there are none. */
+export function unionBox(boxes: Box[]): Box | null {
+  if (boxes.length === 0) {
+    return null;
+  }
+
   const x = Math.min(...boxes.map((b) => b.x));
   const y = Math.min(...boxes.map((b) => b.y));
   return {
@@ -85,4 +96,11 @@ export function focusBox(focus: Focus, atlas: RenderAtlas, flow?: string): Box |
     width: Math.max(...boxes.map((b) => b.x + b.width)) - x,
     height: Math.max(...boxes.map((b) => b.y + b.height)) - y,
   };
+}
+
+const VEIL_PAD = 6;
+
+/** The holes the dimming veil leaves: each focused box with room round it. */
+export function veilHoles(boxes: Box[]): Box[] {
+  return boxes.map((b) => ({ x: b.x - VEIL_PAD, y: b.y - VEIL_PAD, width: b.width + VEIL_PAD * 2, height: b.height + VEIL_PAD * 2 }));
 }

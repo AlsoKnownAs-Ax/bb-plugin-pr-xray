@@ -6,6 +6,7 @@ import { usePrefersReducedMotion } from "@/components/ui/hooks/use-media-query";
 import { Icon } from "@/components/ui/icon";
 import type { Box } from "@coldtea/pr-lens-renderer";
 import type { DiagramRender } from "../shared/schema";
+import { unionBox, veilHoles } from "./walkthrough";
 
 const MIN_SCALE = 0.1;
 const MAX_SCALE = 4;
@@ -16,15 +17,15 @@ export function DiagramCanvas({
   render,
   overlay,
   onBackgroundClick,
-  focus = null,
+  focus = [],
   reserveRight = 0,
 }: {
   render: DiagramRender;
   /** Drawn over the SVG in its viewBox units; gets the zoom so pins can keep their screen size. */
   overlay?: (scale: number) => ReactNode;
   onBackgroundClick?: () => void;
-  /** The box to zoom to and leave undimmed, in the render's viewBox units. */
-  focus?: Box | null;
+  /** The boxes to zoom to and leave undimmed, in the render's viewBox units. */
+  focus?: Box[];
   /** Width of a panel floating over the right edge, kept clear when fitting. */
   reserveRight?: number;
 }) {
@@ -34,15 +35,16 @@ export function DiagramCanvas({
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
 
+  const zoomTo = unionBox(focus);
   const fit = () => {
     const box = containerRef.current?.getBoundingClientRect();
     if (!box) return;
-    const target = focus ?? { x: 0, y: 0, width: render.width, height: render.height };
+    const target = zoomTo ?? { x: 0, y: 0, width: render.width, height: render.height };
     // A narrow canvas has no room beside the panel, so the panel just overlaps it.
     const right = reserveRight && box.width > reserveRight * 2 ? reserveRight : INSET.side;
     const width = Math.max(1, box.width - INSET.side - right);
     const height = Math.max(1, box.height - INSET.top - INSET.bottom);
-    const scale = Math.min(focus ? 1.6 : 1.2, Math.max(MIN_SCALE, Math.min(width / target.width, height / target.height)));
+    const scale = Math.min(zoomTo ? 1.6 : 1.2, Math.max(MIN_SCALE, Math.min(width / target.width, height / target.height)));
     setView({
       scale,
       x: INSET.side + (width - target.width * scale) / 2 - target.x * scale,
@@ -121,7 +123,7 @@ export function DiagramCanvas({
         style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`, width: render.width, height: render.height }}
       >
         <div ref={svgHostRef} className="[&>svg]:block" dangerouslySetInnerHTML={{ __html: render.svg }} />
-        {focus ? <FocusVeil focus={focus} width={render.width} height={render.height} background={render.background} /> : null}
+        {focus.length > 0 ? <FocusVeil focus={focus} width={render.width} height={render.height} background={render.background} /> : null}
         {overlay?.(view.scale)}
       </div>
       <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-md border border-border bg-background/90 p-1 shadow-xs">
@@ -140,19 +142,20 @@ export function DiagramCanvas({
   );
 }
 
-/** Dims everything but the focus: a veil in the canvas colour with a hole round the focused box. */
-function FocusVeil({ focus, width, height, background }: { focus: Box; width: number; height: number; background: string }) {
-  const pad = 6;
-  const hole = { x: focus.x - pad, y: focus.y - pad, width: focus.width + pad * 2, height: focus.height + pad * 2 };
+/** Dims everything but the focus: a veil in the canvas colour with a hole round each focused box. */
+function FocusVeil({ focus, width, height, background }: { focus: Box[]; width: number; height: number; background: string }) {
+  const holes = veilHoles(focus);
   return (
     <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={width} height={height} aria-hidden>
       <path
         fillRule="evenodd"
         fill={background}
         fillOpacity={0.75}
-        d={`M-8000 -8000H${width + 8000}V${height + 8000}H-8000Z M${hole.x} ${hole.y}h${hole.width}v${hole.height}h${-hole.width}Z`}
+        d={`M-8000 -8000H${width + 8000}V${height + 8000}H-8000Z ${holes.map((hole) => `M${hole.x} ${hole.y}h${hole.width}v${hole.height}h${-hole.width}Z`).join(" ")}`}
       />
-      <rect {...hole} rx={10} className="fill-none stroke-primary" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      {holes.map((hole, index) => (
+        <rect key={index} {...hole} rx={10} className="fill-none stroke-primary" strokeWidth={2} vectorEffect="non-scaling-stroke" />
+      ))}
     </svg>
   );
 }

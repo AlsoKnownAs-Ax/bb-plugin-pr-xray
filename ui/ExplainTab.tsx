@@ -14,7 +14,7 @@ import { overlayTargets, type OverlayTarget } from "./diagram-overlay";
 import { useAgentConfirmContext } from "./agent-confirm";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
-import { citeTarget, focusBox, nodeTab, stepTarget, type Focus, type Target } from "./walkthrough";
+import { citeTarget, focusBoxes, nodeTab, stepTarget, type Focus, type Target } from "./walkthrough";
 import { WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel } from "./WalkthroughPanel";
 import type { CiteRef, GraphDoc } from "@coldtea/pr-lens-schema";
 
@@ -83,7 +83,7 @@ function DiagramExplain({
   const steps = graph.walkthrough?.steps ?? [];
   const [step, setStep] = useState<number | null>(null);
   const [focus, setFocus] = useState<Focus>({ kind: "all" });
-  const zoomBox = render ? focusBox(focus, render.atlas, tab.flow) : null;
+  const focused = render ? focusBoxes(focus, render.atlas, tab.flow) : [];
   const show = (target: Target) => {
     if (target.tab) setTabId(target.tab);
     setFocus(target.focus);
@@ -174,7 +174,7 @@ function DiagramExplain({
                     selectStep(null);
                   }}
                   overlay={(scale) => <DiagramOverlay targets={targets} selectedId={selectedId} scale={scale} onSelect={setSelectedId} />}
-                  focus={zoomBox}
+                  focus={focused}
                   reserveRight={steps.length ? WALKTHROUGH_PANEL_WIDTH : 0}
                 />
               ) : null}
