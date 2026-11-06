@@ -28,6 +28,7 @@ export function stripMarker(body: string): string {
 export function createComments(deps: { bb: BbPluginApi; store: Store; github: Github; models: Models }) {
   const { bb, store, github, models } = deps;
   // Tagging worker thread id -> the one comment it may tag, and who awaits it.
+  const TAGGING_TIMEOUT_MS = 3 * 60_000;
   const taggingWorkers = new Map<string, { commentId: string; done: () => void }>();
 
   function publish(ref: PrRef) {
@@ -202,7 +203,11 @@ export function createComments(deps: { bb: BbPluginApi; store: Store; github: Gi
       ...spawnModelArgs(await models.selected("tagging")),
     });
     // Resolves when the worker goes idle or fails, so the UI can show progress.
-    await new Promise<void>((done) => taggingWorkers.set(worker.id, { commentId, done }));
+    const finished = new Promise<void>((done) => taggingWorkers.set(worker.id, { commentId, done }));
+    // A missed idle event (restart, or a failure before spawn returned) would otherwise hang the call.
+    const timeout = setTimeout(() => void settleTagging(worker.id), TAGGING_TIMEOUT_MS);
+    await finished;
+    clearTimeout(timeout);
     if (store.comment(commentId)?.tag == null) throw new Error("AI tagging did not pick a tag.");
   }
 

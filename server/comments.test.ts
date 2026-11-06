@@ -285,6 +285,21 @@ describe("AI tagging", () => {
     await expect(tagging).rejects.toThrow("AI tagging did not pick a tag.");
   });
 
+  it("gives up when the worker never goes idle, and cleans up its thread", async () => {
+    vi.useFakeTimers();
+    try {
+      const { comments, bb } = setup();
+      const tagging = comments.autoTag("cm_1");
+      const outcome = expect(tagging).rejects.toThrow("AI tagging did not pick a tag.");
+      await vi.waitFor(() => expect(bb.sdk.threads.spawn).toHaveBeenCalled());
+      await vi.advanceTimersByTimeAsync(3 * 60_000);
+      await outcome;
+      expect(bb.sdk.threads.archive).toHaveBeenCalledWith({ threadId: "worker" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("refuses to tag a comment that is gone", async () => {
     const { comments, bb } = setup();
     await expect(comments.autoTag("cm_gone")).rejects.toThrow("That comment no longer exists.");
