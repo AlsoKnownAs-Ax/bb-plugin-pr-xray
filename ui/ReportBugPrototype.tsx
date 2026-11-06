@@ -4,6 +4,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const VARIANTS = [
   { key: "A", name: "Labelled button + footer link" },
@@ -13,7 +14,7 @@ const VARIANTS = [
 type VariantKey = (typeof VARIANTS)[number]["key"];
 
 // In memory: bb nav panels have no URL search params to hold ?variant=.
-let current: VariantKey = "A";
+let current: VariantKey = "C";
 const listeners = new Set<() => void>();
 function setVariant(key: VariantKey) {
   current = key;
@@ -64,31 +65,32 @@ export function ReportBugHeaderButton() {
       </Button>
     );
 
+  // Radix popover: closes on outside click and Escape.
   return (
-    <div className="relative">
-      <Button size="sm" variant="ghost" onClick={() => setPreviewOpen(!previewOpen)} aria-expanded={previewOpen}>
-        <Icon name="Bug" />
-        Report a bug
-      </Button>
-      {previewOpen ? (
-        <div className="absolute right-0 top-full z-20 mt-1 w-72 space-y-3 rounded-md border border-border bg-popover p-3 text-sm shadow-md">
-          <p>This opens a bug report on GitHub. You can edit everything before you submit.</p>
-          <ReportDetails />
-          <p className="text-xs text-muted-foreground">The PR isn't included. Link it yourself if it's public.</p>
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => setPreviewOpen(false)}>
-              Cancel
-            </Button>
-            <Button size="sm" asChild onClick={() => setPreviewOpen(false)}>
-              <a href={bugReportUrl()} target="_blank" rel="noreferrer">
-                Open GitHub
-                <Icon name="ExternalLink" />
-              </a>
-            </Button>
-          </div>
+    <Popover open={previewOpen} onOpenChange={setPreviewOpen}>
+      <PopoverTrigger asChild>
+        <Button size="sm" variant="ghost">
+          <Icon name="Bug" />
+          Report a bug
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 space-y-3 text-sm">
+        <p>This opens a bug report on GitHub. You can edit everything before you submit.</p>
+        <ReportDetails />
+        <p className="text-xs text-muted-foreground">The PR isn't included. Link it yourself if it's public.</p>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => setPreviewOpen(false)}>
+            Cancel
+          </Button>
+          <Button size="sm" asChild onClick={() => setPreviewOpen(false)}>
+            <a href={bugReportUrl()} target="_blank" rel="noreferrer">
+              Open GitHub
+              <Icon name="ExternalLink" />
+            </a>
+          </Button>
         </div>
-      ) : null}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

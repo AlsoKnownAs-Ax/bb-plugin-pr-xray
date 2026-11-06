@@ -245,11 +245,11 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             Agent run
           </Button>
         ) : null}
-        <ReportBugHeaderButton />
         <Button size="sm" variant="ghost" onClick={() => setFocus(!focus)} aria-keyshortcuts={focus ? "f Escape" : "f"}>
           <Icon name={focus ? "Minimize2" : "Maximize2"} />
           {focus ? "Exit focus" : "Focus"}
         </Button>
+        <ReportBugHeaderButton />
       </header>
       <PrototypeSwitcher />
 
