@@ -23,6 +23,7 @@ import { useAgentConfirmContext } from "./agent-confirm";
 import { Composer, PendingView, ThreadView } from "./comments";
 import { FixCommentsButton } from "./FixCommentsButton";
 import { FileTree } from "./FileTree";
+import { viewedPaths } from "./file-tree";
 import { prRefKey } from "../shared/pr-ref";
 import { canKeepDraft, draftInDiff, filesNotShown, firstChangedLine, hunkFileDiff, hunkRange, sideLines, threadVisibleIn } from "./diff-utils";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
@@ -237,6 +238,26 @@ export function DiffTab({
     return () => observer.disconnect();
   }, [groups, onActiveGroupChange]);
 
+  // Track which file is on screen for the File tree. Follows file sections, not groups, so it
+  // works with or without an analysis and keeps its path when analysis groups replace the fallback.
+  const [activePath, setActivePath] = useState<string | null>(null);
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+        const path = visible?.target.getAttribute("data-file-path");
+        if (path) setActivePath(path);
+      },
+      { root, rootMargin: "0px 0px -70% 0px" },
+    );
+    root.querySelectorAll("[data-file-path]").forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+    // Re-observe when file sections mount or unmount (groups change, expand or collapse).
+  }, [groups, openOverride, viewed]);
+  const treeViewed = useMemo(() => viewedPaths(pr.files, hunks, viewedHunks), [hunks, pr.files, viewedHunks]);
+
   // Keyboard: j/k hunks, n/p groups, c comment on the current hunk, v toggles it viewed.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -379,7 +400,7 @@ export function DiffTab({
           ) : null}
         </div>
         <nav className="min-h-0 flex-1 overflow-y-auto p-2">
-          {sidebar === "files" ? <FileTree files={treeFiles} onOpen={openFile} /> : null}
+          {sidebar === "files" ? <FileTree files={treeFiles} onOpen={openFile} viewed={treeViewed} activePath={activePath} /> : null}
           {sidebar === "path" && groups.map((group, index) => (
             <div
               key={group.id}
@@ -619,7 +640,7 @@ function GroupHunks({
           data.pr.threads.filter((thread) => !thread.isResolved && threadVisibleIn(thread, file.path, fileHunks)).length +
           data.pending.filter((comment) => comment.path === file.path && draftInDiff(comment, data.pr.headSha, fileHunks)).length;
         return (
-          <div key={fileIndex} id={`file-${fileKey(group.id, file.path)}`} className="scroll-mt-0 rounded-lg border border-border">
+          <div key={fileIndex} id={`file-${fileKey(group.id, file.path)}`} data-file-path={file.path} className="scroll-mt-0 rounded-lg border border-border">
             {/* Sticky so Viewed stays reachable while scrolling a long file. */}
             <div className={cn("sticky top-0 z-10 rounded-t-lg bg-background", !open && "rounded-b-lg")}>
               <div
