@@ -14,6 +14,9 @@ import { overlayTargets, type OverlayTarget } from "./diagram-overlay";
 import { useAgentConfirmContext } from "./agent-confirm";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
+import { citeTarget, focusBox, stepTarget, type Focus, type Target } from "./walkthrough";
+import { WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel } from "./WalkthroughPanel";
+import type { CiteRef } from "@coldtea/pr-lens-schema";
 
 const SEVERITY_STYLE = {
   high: "border-destructive/60 text-destructive",
@@ -49,6 +52,26 @@ export function ExplainTab({
   // A node or table on the current tab, by id.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = targets.find((target) => target.id === selectedId);
+  const steps = result.graph.walkthrough?.steps ?? [];
+  const [step, setStep] = useState<number | null>(null);
+  const [focus, setFocus] = useState<Focus>({ kind: "all" });
+  const zoomBox = render ? focusBox(focus, render.atlas, tab.flow) : null;
+  const show = (target: Target) => {
+    if (target.tab) setTabId(target.tab);
+    setFocus(target.focus);
+  };
+  const selectStep = (index: number | null) => {
+    setStep(index);
+    const chosen = index === null ? undefined : steps[index];
+    if (chosen) show(stepTarget(chosen));
+    else setFocus({ kind: "all" });
+  };
+  const citeAction = (ref: CiteRef) => {
+    if (ref.kind === "file") return () => onOpenFile(ref.path);
+    // Node and table cites open the node panel (#34); column cites stay plain text.
+    const target = citeTarget(result.graph, tabs, ref);
+    return target ? () => show(target) : null;
+  };
 
   const { confirmAgent } = useAgentConfirmContext();
   const fixAll = async () => {
@@ -123,6 +146,7 @@ export function ExplainTab({
                     onClick={() => {
                       setTabId(candidate.id);
                       setSelectedId(null);
+                      selectStep(null);
                     }}
                   >
                     {candidate.title}
@@ -136,10 +160,16 @@ export function ExplainTab({
                 <DiagramCanvas
                   key={tab.id}
                   render={render}
-                  onBackgroundClick={() => setSelectedId(null)}
+                  onBackgroundClick={() => {
+                    setSelectedId(null);
+                    selectStep(null);
+                  }}
                   overlay={(scale) => <DiagramOverlay targets={targets} selectedId={selectedId} scale={scale} onSelect={setSelectedId} />}
+                  focus={zoomBox}
+                  reserveRight={steps.length ? WALKTHROUGH_PANEL_WIDTH : 0}
                 />
               ) : null}
+              {steps.length ? <WalkthroughPanel steps={steps} current={step} onSelect={selectStep} citeAction={citeAction} /> : null}
             </div>
           </section>
 
