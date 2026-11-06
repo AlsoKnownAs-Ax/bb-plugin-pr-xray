@@ -13,6 +13,8 @@ const MAX_SCALE = 4;
 /** Room fitting leaves around the drawing. */
 const INSET = { side: 32, top: 48, bottom: 56 };
 
+const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
+
 export function DiagramCanvas({
   render,
   overlay,
@@ -78,7 +80,7 @@ export function DiagramCanvas({
     if (event.ctrlKey || event.metaKey) {
       const factor = Math.exp(-event.deltaY * 0.01);
       setView((current) => {
-        const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, current.scale * factor));
+        const scale = clampScale(current.scale * factor);
         const px = event.clientX - box.left;
         const py = event.clientY - box.top;
         return { scale, x: px - ((px - current.x) * scale) / current.scale, y: py - ((py - current.y) * scale) / current.scale };
@@ -103,7 +105,7 @@ export function DiagramCanvas({
     drag.current = null;
   };
 
-  const zoom = (factor: number) => setView((current) => ({ ...current, scale: Math.min(MAX_SCALE, Math.max(MIN_SCALE, current.scale * factor)) }));
+  const zoom = (factor: number) => setView((current) => ({ ...current, scale: clampScale(current.scale * factor) }));
 
   return (
     <div

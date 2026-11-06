@@ -6,10 +6,10 @@ import { commentTargets, type DiagramTab } from "../shared/diagram-tabs";
 
 export type Focus = WalkthroughStep["focus"];
 /** A tab to show (undefined = stay on the current one) and what to focus there. */
-export interface Target {
+export type Target = {
   tab: string | undefined;
   focus: Focus;
-}
+};
 
 const ALL: Focus = { kind: "all" };
 const selection = (pick: Partial<Omit<Extract<Focus, { kind: "selection" }>, "kind">>): Focus => ({
@@ -24,45 +24,108 @@ const selection = (pick: Partial<Omit<Extract<Focus, { kind: "selection" }>, "ki
 
 /** The submit check makes every stage name a tab, so a stage id is a tab id. */
 export function stepTarget(step: WalkthroughStep): Target {
-  return { tab: step.stage && (step.stage.kind === "view" ? step.stage.view : step.stage.flow), focus: step.focus };
+  return { tab: stageTab(step.stage), focus: step.focus };
+}
+
+function stageTab(stage: WalkthroughStep["stage"]): string | undefined {
+  if (stage?.kind === "view") {
+    return stage.view;
+  }
+
+  return stage?.flow;
 }
 
 /** Where a flow-step, view or flow cite leads; null for other cites, or ones with no diagram. */
 export function citeTarget(doc: GraphDoc, tabs: DiagramTab[], ref: CiteRef): Target | null {
-  const isTab = (id: string) => tabs.some((tab) => tab.id === id);
-  if (ref.kind === "message") return isTab(ref.flow) ? { tab: ref.flow, focus: selection({ messages: [ref.message] }) } : null;
-  if (ref.kind === "flow") return isTab(ref.flow) ? { tab: ref.flow, focus: ALL } : null;
-  if (ref.kind !== "view") return null;
-  if (isTab(ref.view)) return { tab: ref.view, focus: ALL };
+  const isTab = (id: string | undefined) => tabs.some((tab) => tab.id === id);
+  if (ref.kind === "message" || ref.kind === "flow") {
+    if (!isTab(ref.flow)) {
+      return null;
+    }
+
+    return { tab: ref.flow, focus: citedStep(ref) };
+  }
+
+  if (ref.kind !== "view") {
+    return null;
+  }
+
+  if (isTab(ref.view)) {
+    return { tab: ref.view, focus: ALL };
+  }
+
   // A view with no tab: a flow view shows its flow, a drill-down shows its selection on its lens's tab.
   const view = findView(doc.views, ref.view);
-  if (!view) return null;
-  if (view.lens === "data-flow") {
-    const flow = view.scope.kind === "selection" ? view.scope.flows[0] : doc.flows[0]?.id;
-    return flow && isTab(flow) ? { tab: flow, focus: ALL } : null;
+  if (!view) {
+    return null;
   }
+
+  if (view.lens === "data-flow") {
+    const flow = viewFlow(doc, view);
+    if (!isTab(flow)) {
+      return null;
+    }
+
+    return { tab: flow, focus: ALL };
+  }
+
   const tab = tabs.find((candidate) => candidate.lens === view.lens);
-  if (!tab) return null;
-  const { scope } = view;
-  return {
-    tab: tab.id,
-    focus: scope.kind === "all" ? ALL : selection({ lanes: scope.lanes, nodes: scope.nodes, edges: scope.edges, tables: scope.tables }),
-  };
+  if (!tab) {
+    return null;
+  }
+
+  return { tab: tab.id, focus: scopeFocus(view.scope) };
+}
+
+/** A flow-step cite focuses its step; a flow cite shows the whole flow. */
+function citedStep(ref: Extract<CiteRef, { kind: "message" | "flow" }>): Focus {
+  if (ref.kind === "message") {
+    return selection({ messages: [ref.message] });
+  }
+
+  return ALL;
+}
+
+/** The flow a data-flow view draws: its selected flow, else the document's first. */
+function viewFlow(doc: GraphDoc, view: View): string | undefined {
+  if (view.scope.kind === "selection") {
+    return view.scope.flows[0];
+  }
+
+  return doc.flows[0]?.id;
+}
+
+function scopeFocus(scope: View["scope"]): Focus {
+  if (scope.kind === "all") {
+    return ALL;
+  }
+
+  return selection({ lanes: scope.lanes, nodes: scope.nodes, edges: scope.edges, tables: scope.tables });
 }
 
 /** The tab to select a cited node or table on: the current tab if it draws it, else the first that does; null if none. */
 export function nodeTab(doc: GraphDoc, tabs: DiagramTab[], current: string, id: string): string | null {
   const draws = (tab: DiagramTab) => commentTargets(doc, tab).has(id);
   const here = tabs.find((tab) => tab.id === current);
-  if (here && draws(here)) return here.id;
+  if (here && draws(here)) {
+    return here.id;
+  }
+
   return tabs.find(draws)?.id ?? null;
 }
 
 function findView(views: View[], id: string): View | undefined {
   for (const view of views) {
-    const found = view.id === id ? view : findView(view.children, id);
-    if (found) return found;
+    if (view.id === id) {
+      return view;
+    }
+
+    const found = findView(view.children, id);
+    if (found) {
+      return found;
+    }
   }
+
   return undefined;
 }
 

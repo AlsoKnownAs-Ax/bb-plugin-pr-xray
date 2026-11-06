@@ -98,13 +98,14 @@ function DiagramExplain({
     if (ref.kind === "file") return () => onOpenFile(ref.path);
     // Node and table cites open the node panel; column cites stay plain text.
     if (ref.kind === "node" || ref.kind === "table") {
-      const onTab = nodeTab(graph, tabs, tab.id, ref.kind === "node" ? ref.node : ref.table);
+      const id = partId(ref);
+      const onTab = nodeTab(graph, tabs, tab.id, id);
       return onTab
         ? () => {
             // The step's zoom belongs to its own tab; drop it when switching away.
             if (onTab !== tab.id) setFocus({ kind: "all" });
             setTabId(onTab);
-            setSelectedId(ref.kind === "node" ? ref.node : ref.table);
+            setSelectedId(id);
           }
         : null;
     }
@@ -291,6 +292,15 @@ function Explanation({
       ) : null}
     </div>
   );
+}
+
+/** The node or table a cite names. */
+function partId(ref: Extract<CiteRef, { kind: "node" | "table" }>): string {
+  if (ref.kind === "node") {
+    return ref.node;
+  }
+
+  return ref.table;
 }
 
 function CommentList({

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { rpcContract } from "./shared/contract";
 import { parsePrRef, prRefKey, prRefToSubPath, REVIEW_PANEL_PATH } from "./shared/pr-ref";
 import { threadsToFix } from "./shared/fix-scope";
-import { diagramTabs } from "./shared/diagram-tabs";
+import { diagramTab } from "./shared/diagram-tabs";
 import type { FixScope, PrDetails, PrRef, ReviewThread } from "./shared/schema";
 import { agentTools, REVIEW_TOOL } from "./server/agent-tools";
 import { createAnalysis, findTicketUrl } from "./server/analysis";
@@ -266,7 +266,7 @@ export default async function plugin(bb: BbPluginApi) {
       const titles = new Map<string, string>();
       for (const comment of open) {
         const graph = store.analysis(comment.analysisId ?? "")?.result?.graph;
-        const tab = graph && diagramTabs(graph).find((candidate) => candidate.id === comment.diagramId);
+        const tab = graph && diagramTab(graph, comment.diagramId);
         if (tab) titles.set(tab.id, tab.title);
       }
       return fixDiagramComments(bb, pr, open, titles);

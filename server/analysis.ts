@@ -6,7 +6,7 @@ import { join } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { PrLensRenderError } from "@coldtea/pr-lens-renderer";
-import { safeParseGraphDoc, type GraphDoc } from "@coldtea/pr-lens-schema";
+import { safeParseGraphDoc, type GraphDoc, type WalkthroughStep } from "@coldtea/pr-lens-schema";
 import { diagramTabs } from "../shared/diagram-tabs";
 import { analysisBaseSchema, type AnalysisResult, type PrDetails, type PrRef } from "../shared/schema";
 import { prRefKey } from "../shared/pr-ref";
@@ -149,20 +149,32 @@ function graphProblems(doc: GraphDoc): string[] {
   if (tabs.length > MAX_DIAGRAMS) {
     problems.push(`graph: draws ${tabs.length} diagrams (the overview, each flow and the data model); keep it to ${MAX_DIAGRAMS}.`);
   }
-  const ids = new Set<string>();
-  for (const tab of tabs) {
-    if (ids.has(tab.id)) problems.push(`graph: two diagrams share the id '${tab.id}'; give each view, flow and the data model its own id.`);
-    ids.add(tab.id);
-  }
+
+  tabs
+    .filter((tab, index) => tabs.findIndex((other) => other.id === tab.id) < index)
+    .forEach((tab) => problems.push(`graph: two diagrams share the id '${tab.id}'; give each view, flow and the data model its own id.`));
   const steps = doc.walkthrough?.steps ?? [];
-  if (steps.length === 0) problems.push("graph.walkthrough: missing; write a walkthrough of 2-12 steps.");
-  const viewTabs = new Set(tabs.filter((tab) => tab.view !== undefined).map((tab) => tab.view));
-  for (const step of steps) {
-    if (step.stage?.kind === "view" && !viewTabs.has(step.stage.view)) {
-      problems.push(`graph.walkthrough: step '${step.id}' stages view '${step.stage.view}', which is not a diagram tab; stage the overview view, the data-model view or a flow.`);
-    }
+  if (steps.length === 0) {
+    problems.push("graph.walkthrough: missing; write a walkthrough of 2-12 steps.");
   }
+
+  const viewTabs = new Set(tabs.filter((tab) => tab.view !== undefined).map((tab) => tab.view));
+  steps
+    .map((step) => ({ id: step.id, view: stagedView(step) }))
+    .filter((staged) => staged.view !== undefined)
+    .filter((staged) => !viewTabs.has(staged.view))
+    .forEach((staged) => {
+      problems.push(`graph.walkthrough: step '${staged.id}' stages view '${staged.view}', which is not a diagram tab; stage the overview view, the data-model view or a flow.`);
+    });
   return problems;
+}
+
+function stagedView(step: WalkthroughStep): string | undefined {
+  if (step.stage?.kind !== "view") {
+    return undefined;
+  }
+
+  return step.stage.view;
 }
 
 /** Problems a schema cannot express: hunk coverage and cross references. */

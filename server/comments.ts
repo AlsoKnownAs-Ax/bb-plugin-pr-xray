@@ -8,7 +8,7 @@ import {
   type DraftComment,
   type PrRef,
 } from "../shared/schema";
-import { commentTargets, diagramTabs } from "../shared/diagram-tabs";
+import { commentTargets, diagramTab, diagramTabs } from "../shared/diagram-tabs";
 import { prRefKey } from "../shared/pr-ref";
 import type { Github, RawReviewComment } from "./github";
 import type { Models } from "./models";
@@ -122,9 +122,12 @@ export function createComments(deps: { bb: BbPluginApi; store: Store; github: Gi
   function addDiagramComment(input: { ref: PrRef; analysisId: string; diagramId: string; nodeId: string; body: string }) {
     const record = store.analysis(input.analysisId);
     const graph = record?.result?.graph;
-    const tab = graph && diagramTabs(graph).find((candidate) => candidate.id === input.diagramId);
+    const tab = graph && diagramTab(graph, input.diagramId);
     const nodeLabel = graph && tab && commentTargets(graph, tab).get(input.nodeId);
-    if (!record || !nodeLabel) throw new Error("That diagram node no longer exists.");
+    if (!record || !nodeLabel) {
+      throw new Error("That diagram node no longer exists.");
+    }
+
     const comment = store.insertComment({
       source: "diagram",
       ref: input.ref,
