@@ -10,8 +10,10 @@ Understand a GitHub pull request before you review it:
 
 ## Install
 
+Find **PR X-ray** in bb's plugin store (Settings → Plugins), or run:
+
 ```sh
-bb plugin install git:github.com/AlsoKnownAs-Ax/bb-plugin-pr-xray
+bb plugin install pr-xray@bb-community
 ```
 
 Open it with the command palette (**PR X-ray: Review a pull request**; bind a shortcut in Settings → Keyboard), from the **PR X-ray** page in the nav rail, by asking any agent to "x-ray <PR url>", or with `bb pr-xray review <url>`.
