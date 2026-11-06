@@ -69,9 +69,8 @@ export function ReportBugHeaderButton() {
   return (
     <Popover open={previewOpen} onOpenChange={setPreviewOpen}>
       <PopoverTrigger asChild>
-        <Button size="sm" variant="ghost">
+        <Button size="sm" variant="ghost" aria-label="Report a bug">
           <Icon name="Bug" />
-          Report a bug
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-3 text-sm">
