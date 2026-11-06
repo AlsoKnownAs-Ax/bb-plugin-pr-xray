@@ -95,7 +95,7 @@ export function ChatBubble({
               </Button>
             ) : null}
             <Button size="icon" variant="ghost" className="size-7" onClick={() => setOpen(false)} aria-label="Close chat">
-              <span aria-hidden className="text-base leading-none">×</span>
+              <Icon name="X" />
             </Button>
           </header>
           <div className="min-h-0 flex-1">

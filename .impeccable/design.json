@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-06T16:15:40Z",
+  "title": "Design System: PR X-ray",
+  "extensions": {
+    "colorMeta": {
+      "foreground": { "role": "primary", "displayName": "Ink", "canonical": "var(--foreground)" },
+      "primary": { "role": "primary", "displayName": "Signal Line", "canonical": "var(--primary)" },
+      "background": { "role": "neutral", "displayName": "Paper", "canonical": "var(--background)" },
+      "card": { "role": "neutral", "displayName": "Sheet", "canonical": "var(--card)" },
+      "muted-foreground": { "role": "neutral", "displayName": "Pencil", "canonical": "var(--muted-foreground)" },
+      "muted": { "role": "neutral", "displayName": "Wash", "canonical": "var(--muted)" },
+      "border": { "role": "neutral", "displayName": "Rule", "canonical": "var(--border)" },
+      "input": { "role": "neutral", "displayName": "Rule (controls)", "canonical": "var(--input)" },
+      "ring": { "role": "neutral", "displayName": "Focus Ring", "canonical": "var(--ring)" },
+      "secondary": { "role": "neutral", "displayName": "Secondary Fill", "canonical": "var(--secondary)" },
+      "state-hover": { "role": "neutral", "displayName": "Touch", "canonical": "var(--state-hover)" },
+      "state-active": { "role": "neutral", "displayName": "Touch (active)", "canonical": "var(--state-active)" },
+      "warning": { "role": "tertiary", "displayName": "Amber Attention", "canonical": "var(--warning)" },
+      "warning-text": { "role": "tertiary", "displayName": "Amber Attention (text)", "canonical": "var(--warning-text)" },
+      "success": { "role": "tertiary", "displayName": "Added", "canonical": "var(--success)" },
+      "destructive": { "role": "tertiary", "displayName": "Removed / Error", "canonical": "var(--destructive)" }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "Section and group headings, card titles." },
+      "body": { "displayName": "Body", "purpose": "Comments, walkthrough text, dialogs." },
+      "body-small": { "displayName": "Body small", "purpose": "Meta lines, file rows, small buttons." },
+      "label": { "displayName": "Label", "purpose": "Chips, legends, counts, keyboard hints." },
+      "overline": { "displayName": "Overline", "purpose": "Uppercase node kinds and severity words." },
+      "code": { "displayName": "Code", "purpose": "Paths, SHAs, file lists." }
+    },
+    "shadows": [
+      { "name": "hairline", "value": "var(--shadow-xs)", "purpose": "Comment cards, diagram nodes and toolbar: objects on the table." },
+      { "name": "node-hover", "value": "var(--shadow-md)", "purpose": "Diagram node on hover." },
+      { "name": "launcher", "value": "var(--shadow-lg)", "purpose": "Floating chat launcher button." },
+      { "name": "floating-panel", "value": "var(--shadow-2xl)", "purpose": "Floating chat panel." }
+    ],
+    "motion": [
+      { "name": "control-hover", "value": "background-color, color 150ms cubic-bezier(0.4, 0, 0.2, 1); 0ms on hover-in", "purpose": "Controls react instantly on hover, ease out on leave." },
+      { "name": "list-hover", "value": "none", "purpose": "List rows change on hover with no transition." },
+      { "name": "progress", "value": "width 1000ms linear", "purpose": "Analysis progress bar." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one solid action per area.",
+      "html": "<button class=\"ds-btn-primary\">Submit review</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 8px 16px; border: none; border-radius: calc(var(--radius) - 2px); background: var(--foreground); color: var(--background); font: 500 0.8125rem var(--font-sans); cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: color-mix(in oklab, var(--foreground) 90%, transparent); transition-duration: 0ms; } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--ring); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary actions next to a primary.",
+      "html": "<button class=\"ds-btn-outline\">Cancel</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; height: 36px; padding: 8px 16px; border: 1px solid var(--input); border-radius: calc(var(--radius) - 2px); background: transparent; color: var(--foreground); font: 500 0.8125rem var(--font-sans); cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-outline:hover { background: var(--state-hover); transition-duration: 0ms; } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--ring); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost-hover",
+      "description": "Toolbars and row actions; no chrome until hover.",
+      "html": "<button class=\"ds-btn-ghost\" aria-pressed=\"false\">Split</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; height: 32px; padding: 0 12px; border: none; border-radius: calc(var(--radius) - 2px); background: transparent; color: var(--muted-foreground); font: 500 0.75rem var(--font-sans); cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-btn-ghost:hover { background: var(--state-hover); color: var(--foreground); transition-duration: 0ms; } .ds-btn-ghost[aria-pressed=true] { background: var(--state-active); color: var(--foreground); } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--ring); }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Text field from the bb kit.",
+      "html": "<input class=\"ds-input\" placeholder=\"https://github.com/owner/repo/pull/123\" />",
+      "css": ".ds-input { width: 100%; height: 36px; padding: 4px 12px; border: 1px solid var(--input); border-radius: calc(var(--radius) - 2px); background: transparent; color: var(--foreground); font: 400 0.8125rem var(--font-sans); transition: border-color 150ms; } .ds-input::placeholder { color: var(--muted-foreground); } .ds-input:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--ring); }"
+    },
+    {
+      "name": "Tag Chip",
+      "kind": "chip",
+      "refersTo": "tag-chip",
+      "description": "Retro tag on a comment; clickable to change.",
+      "html": "<button class=\"ds-chip\">missing-test</button>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 9999px; background: transparent; color: var(--muted-foreground); font: 500 11px var(--font-sans); cursor: pointer; } .ds-chip:hover { background: var(--state-hover); color: var(--foreground); } .ds-chip:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--ring); }"
+    },
+    {
+      "name": "Attention Pill",
+      "kind": "chip",
+      "refersTo": "attention-pill",
+      "description": "Marks files updated since viewed.",
+      "html": "<span class=\"ds-pill-attention\">updated</span>",
+      "css": ".ds-pill-attention { display: inline-flex; align-items: center; padding: 0 6px; border: 1px solid color-mix(in oklab, var(--warning) 60%, transparent); border-radius: 9999px; background: color-mix(in oklab, var(--warning) 10%, transparent); color: var(--warning-text); font: 400 0.75rem var(--font-sans); }"
+    },
+    {
+      "name": "Open Comment Thread",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Inline review thread; Sheet while open, muted tint when settled.",
+      "html": "<div class=\"ds-thread\"><div class=\"ds-thread-head\">src/review.ts · line 42</div><div class=\"ds-thread-body\">Should this handle the empty diff case?</div></div>",
+      "css": ".ds-thread { max-width: 48rem; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow-xs); font: 400 0.8125rem var(--font-sans); color: var(--foreground); } .ds-thread-head { padding: 6px 12px; border-bottom: 1px solid var(--border); font: 400 0.75rem var(--font-mono); color: var(--foreground); } .ds-thread-body { padding: 8px 12px; }"
+    },
+    {
+      "name": "Diagram Node",
+      "kind": "custom",
+      "description": "Explain-tab diagram node tinted by change kind, with comment counter.",
+      "html": "<div class=\"ds-node\"><span class=\"ds-node-kind\">module</span><span class=\"ds-node-title\">worker-clone</span><span class=\"ds-node-count\">2</span></div>",
+      "css": ".ds-node { position: relative; display: inline-flex; flex-direction: column; padding: 8px 12px; border: 2px solid color-mix(in oklab, var(--warning) 70%, transparent); border-radius: var(--radius); background: color-mix(in oklab, var(--warning) 10%, transparent); box-shadow: var(--shadow-xs); transition: box-shadow 150ms; font-family: var(--font-sans); color: var(--foreground); } .ds-node:hover { box-shadow: var(--shadow-md); } .ds-node-kind { font-size: 10px; text-transform: uppercase; letter-spacing: 0.025em; color: var(--muted-foreground); } .ds-node-title { font-size: 0.8125rem; font-weight: 500; } .ds-node-count { position: absolute; top: -10px; right: -10px; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border: 2px solid var(--background); border-radius: 9999px 9999px 9999px 0; background: var(--warning); font-size: 11px; font-weight: 600; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Light Table",
+    "overview": "PR X-ray is a quiet, evenly lit surface where a change is laid out to be read. The chrome stays neutral and small so the code, the walkthrough and the diagrams are the subject. It is an Operate surface inside bb: dense, scannable, and native. Every color, font and radius comes from bb's active theme through CSS variables, so the plugin looks right in any bb theme, light or dark, without owning a palette of its own.\n\nBrand lives in precise details, not decoration: a single amber \"attention\" voice for anything that needs the reviewer (open threads, files changed since viewed, untrusted content), monospace for anything that is a path or a commit, and instant hover feedback. Depth is flat. Borders separate things; shadows are reserved for what floats above the page.",
+    "keyCharacteristics": [
+      "Theme-inherited: no hard-coded colors, fonts or radii.",
+      "Dense, small type (13px body, 11px labels) tuned for long reading sessions.",
+      "One attention color (warning) carries every \"look here\" signal.",
+      "Flat, border-first surfaces; shadows only for floating layers.",
+      "Quiet and exact controls: small, low-contrast, instant hover."
+    ],
+    "rules": [
+      { "name": "The Borrowed Light Rule", "body": "Every color is a bb theme variable. Never write a hex value in plugin UI; if a role is missing, use the nearest bb token.", "section": "colors" },
+      { "name": "The One Attention Rule", "body": "Anything that asks the reviewer to act uses the warning family. Don't add a second accent for attention.", "section": "colors" },
+      { "name": "The Repo-Is-Mono Rule", "body": "If the text is copied from the repository (path, SHA, branch), set it in mono. Nothing else is mono.", "section": "typography" },
+      { "name": "The Light Table Rule", "body": "Nothing on the page casts a real shadow. Only layers that float above it (chat, popovers, dialogs) do.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use bb theme variables for every color, font, radius and shadow.",
+      "Do build from `components/ui` before writing a new control.",
+      "Do route every \"needs your attention\" signal through the warning family (tint fill, 50–70% border, `warning-text`).",
+      "Do set repository text (paths, SHAs) in mono.",
+      "Do keep hover instant (`duration-0` in, 150ms out) on controls."
+    ],
+    "donts": [
+      "Don't hard-code hex colors or font families in plugin UI.",
+      "Don't add shadows to on-page cards beyond the hairline; save real elevation for floating layers.",
+      "Don't put more than one solid (primary) button in the same area.",
+      "Don't load remote images or media in comment or analysis content; show links or plain text."
+    ]
+  }
+}

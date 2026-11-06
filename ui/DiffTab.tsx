@@ -220,7 +220,7 @@ export function DiffTab({
     return () => observer.disconnect();
   }, [groups, onActiveGroupChange]);
 
-  // Keyboard: j/k hunks, n/p groups, c comment on the current hunk.
+  // Keyboard: j/k hunks, n/p groups, c comment on the current hunk, v toggles it viewed.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
@@ -241,6 +241,12 @@ export function DiffTab({
           setActiveHunk(next.hunkIds[0] ?? null);
           event.preventDefault();
         }
+      } else if (event.key === "v") {
+        const hunk = hunks.get(activeHunk ?? "");
+        if (hunk) {
+          onSetViewed([hunk.fingerprint], !viewedHunks.has(hunk.fingerprint));
+          event.preventDefault();
+        }
       } else if (event.key === "c") {
         const hunk = hunks.get(activeHunk ?? groups.find((group) => group.id === activeGroupId)?.hunkIds[0] ?? "");
         const file = hunk ? files.get(hunk.fileIndex) : undefined;
@@ -253,7 +259,7 @@ export function DiffTab({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [activeHunk, activeGroupId, files, groups, hunkOrder, hunks, scrollTo]);
+  }, [activeHunk, activeGroupId, files, groups, hunkOrder, hunks, onSetViewed, scrollTo, viewedHunks]);
 
   const anchoredThreadIds = useMemo(() => {
     const ids = new Set<string>();
@@ -390,7 +396,7 @@ export function DiffTab({
             {data.pending.length > 0 ? `Submit review (${data.pending.length})` : "Submit review"}
           </Button>
           <FixCommentsButton counts={{ mine: myOpenThreads, all: allOpenThreads }} onFix={(scope) => void fixComments(scope)} />
-          <p className="text-[11px] text-muted-foreground">j/k hunks · n/p groups · c comment</p>
+          <p className="text-[11px] text-muted-foreground">j/k hunks · n/p groups · c comment · v viewed · f focus · 1/2 tabs</p>
         </div>
       </aside>
 
@@ -615,7 +621,7 @@ function GroupHunks({
                 ) : null}
                 {comments > 0 ? (
                   <span
-                    className="flex shrink-0 items-center gap-1 rounded-full border border-warning/60 bg-warning/10 px-1.5 text-warning-text"
+                    className="flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 text-muted-foreground"
                     title={`${comments} open comment${comments === 1 ? "" : "s"}`}
                   >
                     <Icon name="MessageSquare" className="size-3" />
