@@ -17,17 +17,32 @@ export type DiagramTab = {
 };
 
 export function diagramTabs(doc: GraphDoc): DiagramTab[] {
-  const overview = doc.views.find((view) => view.lens === "architecture");
-  const dataModel = doc.views.find((view) => view.lens === "data-model");
-  const tabs: DiagramTab[] = [
-    { id: overview?.id ?? OVERVIEW_TAB, title: overview?.title ?? "Architecture", lens: "architecture", view: overview?.id },
+  const tabs = [
+    viewTab(doc, "architecture"),
     ...doc.flows.map((flow): DiagramTab => ({ id: flow.id, title: flow.title, lens: "data-flow", flow: flow.id })),
   ];
   if (!doc.dataModel) {
     return tabs;
   }
 
-  return [...tabs, { id: dataModel?.id ?? DATA_MODEL_TAB, title: dataModel?.title ?? "Data model", lens: "data-model", view: dataModel?.id }];
+  return [...tabs, viewTab(doc, "data-model")];
+}
+
+const DEFAULT_VIEW_TABS = {
+  architecture: { id: OVERVIEW_TAB, title: "Architecture" },
+  "data-model": { id: DATA_MODEL_TAB, title: "Data model" },
+} satisfies Record<ViewTabLens, Pick<DiagramTab, "id" | "title">>;
+
+type ViewTabLens = "architecture" | "data-model";
+
+/** The overview or data-model tab: the document's first view of that lens, else a default tab. */
+function viewTab(doc: GraphDoc, lens: ViewTabLens): DiagramTab {
+  const view = doc.views.find((candidate) => candidate.lens === lens);
+  if (!view) {
+    return { ...DEFAULT_VIEW_TABS[lens], lens };
+  }
+
+  return { id: view.id, title: view.title, lens, view: view.id };
 }
 
 /** One diagram tab of a document, by id. */
@@ -39,12 +54,12 @@ export function diagramTab(doc: GraphDoc, id: string | null): DiagramTab | undef
 export function commentTargets(doc: GraphDoc, tab: DiagramTab): Map<string, string> {
   const nodes = new Map(doc.nodes.map((node) => [node.id, node.label]));
   if (tab.lens === "data-model") {
-    return new Map((doc.dataModel?.tables ?? []).map((table) => [table.id, table.label]));
+    return new Map(doc.dataModel?.tables.map((table) => [table.id, table.label]));
   }
 
   if (tab.lens === "data-flow") {
     const flow = doc.flows.find((candidate) => candidate.id === tab.flow);
-    return new Map((flow?.participants ?? []).map((participant) => [participant.node, nodes.get(participant.node) ?? participant.node]));
+    return new Map(flow?.participants.map((participant) => [participant.node, nodes.get(participant.node) ?? participant.node]));
   }
 
   return nodes;
