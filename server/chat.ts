@@ -4,6 +4,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import type { GraphDoc } from "@coldtea/pr-lens-schema";
 import type { AnalysisRecord, PrDetails, PrRef } from "../shared/schema";
 import { prRefKey } from "../shared/pr-ref";
 import { annotatedDiff } from "./analysis";
@@ -53,33 +54,8 @@ function contextDocument(pr: PrDetails, analysis: AnalysisRecord | null): string
       for (const item of result.lookClosely) parts.push(`- [${item.severity}] ${item.title}: ${item.reason}`);
     }
     // A legacy analysis has no graph: re-run it for the walkthrough and diagrams.
-    const { graph } = result;
-    if (graph) {
-      parts.push("", "### Walkthrough");
-      (graph.walkthrough?.steps ?? []).forEach((step, index) => {
-        parts.push(`${index + 1}. ${step.heading}: ${step.body}${step.detail ? ` ${step.detail.text}` : ""}`);
-      });
-      parts.push("", "### Diagram parts (architecture lanes; delta in brackets)");
-      for (const lane of graph.lanes) {
-        parts.push(`- ${lane.label}`);
-        for (const node of graph.nodes.filter((candidate) => candidate.lane === lane.id)) {
-          parts.push(`  - ${node.label} (${node.kind}) [${node.delta}]${node.files.length > 0 ? `: ${node.files.map((file) => file.path).join(", ")}` : ""}`);
-        }
-      }
-      const label = new Map(graph.nodes.map((node) => [node.id, node.label]));
-      for (const flow of graph.flows) {
-        parts.push("", `### Flow: ${flow.title}`);
-        flow.messages.forEach((message, index) => {
-          parts.push(`${index + 1}. ${label.get(message.from) ?? message.from} -> ${label.get(message.to) ?? message.to}: ${message.label} [${message.delta}]`);
-        });
-      }
-      if (graph.dataModel) {
-        parts.push("", "### Data model");
-        for (const table of graph.dataModel.tables) {
-          const changed = table.columns.filter((column) => column.delta !== "unchanged");
-          parts.push(`- ${table.label} [${table.delta}]${changed.length > 0 ? `: ${changed.map((column) => `${column.name} ${column.previousType ? `${column.previousType} -> ` : ""}${column.type} [${column.delta}]`).join(", ")}` : ""}`);
-        }
-      }
+    if (result.graph) {
+      parts.push(...graphContext(result.graph));
     }
   } else {
     parts.push("", "## PR X-ray analysis", "Not available yet.");
@@ -94,6 +70,57 @@ function contextDocument(pr: PrDetails, analysis: AnalysisRecord | null): string
   }
   parts.push("", analysis?.headSha === pr.headSha ? "## Diff (hunk ids match the groups above)" : "## Diff", annotatedDiff(pr));
   return parts.join("\n");
+}
+
+/** The walkthrough and diagrams of a PR Lens document, as context lines for the chat. */
+export function graphContext(graph: GraphDoc): string[] {
+  const label = new Map(graph.nodes.map((node) => [node.id, node.label]));
+  const named = (id: string) => label.get(id) ?? id;
+  return [
+    "",
+    "### Walkthrough",
+    ...(graph.walkthrough?.steps ?? []).map((step, index) => `${index + 1}. ${step.heading}: ${step.body}${suffix(" ", step.detail?.text)}`),
+    "",
+    "### Diagram parts (architecture lanes; delta in brackets)",
+    ...graph.lanes.flatMap((lane) => [
+      `- ${lane.label}`,
+      ...graph.nodes
+        .filter((node) => node.lane === lane.id)
+        .map((node) => `  - ${node.label} (${node.kind}) [${node.delta}]${suffix(": ", node.files.map((file) => file.path).join(", "))}`),
+    ]),
+    ...graph.flows.flatMap((flow) => [
+      "",
+      `### Flow: ${flow.title}`,
+      ...flow.messages.map((message, index) => `${index + 1}. ${named(message.from)} -> ${named(message.to)}: ${message.label} [${message.delta}]`),
+    ]),
+    ...dataModelContext(graph.dataModel),
+  ];
+}
+
+function dataModelContext(dataModel: GraphDoc["dataModel"]): string[] {
+  if (!dataModel) {
+    return [];
+  }
+
+  return [
+    "",
+    "### Data model",
+    ...dataModel.tables.map((table) => {
+      const changed = table.columns
+        .filter((column) => column.delta !== "unchanged")
+        .map((column) => `${column.name} ${suffix("", column.previousType, " -> ")}${column.type} [${column.delta}]`);
+      return `- ${table.label} [${table.delta}]${suffix(": ", changed.join(", "))}`;
+    }),
+  ];
+}
+
+/** `text` between `before` and `after`, or nothing when there is no text. */
+function suffix(before: string, text: string | undefined, after = ""): string {
+  if (!text) {
+    return "";
+  }
+
+  return `${before}${text}${after}`;
 }
 
 export function chatInstructions(metadata: Readonly<Record<string, unknown>>): string | undefined {
