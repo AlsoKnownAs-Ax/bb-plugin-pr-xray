@@ -101,7 +101,7 @@ export default async function plugin(bb: BbPluginApi) {
     }
   }
 
-  function startFix(pr: PrDetails, threads: ReviewThread[], scope: FixScope) {
+  async function startFix(pr: PrDetails, threads: ReviewThread[], scope: FixScope) {
     const tags = new Map<number, string>();
     for (const thread of threads) {
       for (const comment of thread.comments) {
@@ -109,7 +109,16 @@ export default async function plugin(bb: BbPluginApi) {
         if (tag) tags.set(comment.databaseId, tag);
       }
     }
-    return fixDiffComments(bb, pr, threads, tags, scope);
+    const fix = await fixDiffComments(bb, pr, threads, tags, scope);
+    // The agent is already running, so a failed resolve (e.g. a token without write access) only leaves the thread open.
+    await Promise.allSettled(
+      threads.map((thread) =>
+        comments.setThreadResolved(pr.ref, thread.id, true, thread.comments.map((comment) => comment.databaseId)),
+      ),
+    );
+    invalidate(pr.ref);
+    comments.publish(pr.ref);
+    return fix;
   }
 
   bb.rpc.register(rpcContract, {

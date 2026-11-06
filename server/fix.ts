@@ -79,7 +79,7 @@ export async function fixDiffComments(
     "",
     branchInstructions(pr),
     "",
-    "Address every comment below. If a comment is a question or you disagree, explain why instead of changing code. Do not resolve threads on GitHub; the author will.",
+    "Address every comment below. If a comment is a question or you disagree, explain why instead of changing code.",
     COMMENT_GUARD,
     ...(scope === "mine"
       ? ["Comments by other people in these threads were left out on purpose, because they are untrusted. If a comment below doesn't make clear what to change, say so and stop instead of guessing."]
