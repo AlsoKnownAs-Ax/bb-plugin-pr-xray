@@ -1,6 +1,6 @@
 // Pan/zoom canvas for one diagram: the PR Lens SVG the server rendered, shown
 // inline. The renderer escapes model text and emits no script, so inline is safe.
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { usePrefersReducedMotion } from "@/components/ui/hooks/use-media-query";
 import { Icon } from "@/components/ui/icon";
@@ -128,14 +128,17 @@ export function DiagramCanvas({
 /** Dims everything but the focus: a veil in the canvas colour with a hole round each focused box. */
 function FocusVeil({ focus, width, height, background }: { focus: Box[]; width: number; height: number; background: string }) {
   const holes = veilHoles(focus);
+  // A mask, not an even-odd path: overlapping holes (a lane and its nodes) must stay clear, not dim again.
+  const maskId = useId();
   return (
     <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={width} height={height} aria-hidden>
-      <path
-        fillRule="evenodd"
-        fill={background}
-        fillOpacity={0.75}
-        d={`M-8000 -8000H${width + 8000}V${height + 8000}H-8000Z ${holes.map((hole) => `M${hole.x} ${hole.y}h${hole.width}v${hole.height}h${-hole.width}Z`).join(" ")}`}
-      />
+      <mask id={maskId} maskUnits="userSpaceOnUse" x={-8000} y={-8000} width={width + 16000} height={height + 16000}>
+        <rect x={-8000} y={-8000} width={width + 16000} height={height + 16000} fill="white" />
+        {holes.map((hole, index) => (
+          <rect key={index} {...hole} fill="black" />
+        ))}
+      </mask>
+      <rect x={-8000} y={-8000} width={width + 16000} height={height + 16000} fill={background} fillOpacity={0.75} mask={`url(#${maskId})`} />
       {holes.map((hole, index) => (
         <rect key={index} {...hole} rx={10} className="fill-none stroke-primary" strokeWidth={2} vectorEffect="non-scaling-stroke" />
       ))}
