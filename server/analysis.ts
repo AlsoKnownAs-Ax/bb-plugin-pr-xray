@@ -187,9 +187,7 @@ function graphProblems(doc: GraphDoc): string[] {
     problems.push(`graph: draws ${tabs.length} diagrams (the overview, each flow and the data model); keep it to ${MAX_DIAGRAMS}.`);
   }
 
-  tabs
-    .filter((tab, index) => tabs.findIndex((other) => other.id === tab.id) < index)
-    .forEach((tab) => problems.push(`graph: two diagrams share the id '${tab.id}'; give each view, flow and the data model its own id.`));
+  duplicateIds(tabs).forEach((id) => problems.push(`graph: two diagrams share the id '${id}'; give each view, flow and the data model its own id.`));
   const steps = doc.walkthrough?.steps ?? [];
   if (steps.length === 0) {
     problems.push("graph.walkthrough: missing; write a walkthrough of 2-12 steps.");
@@ -204,6 +202,11 @@ function graphProblems(doc: GraphDoc): string[] {
       problems.push(`graph.walkthrough: step '${staged.id}' stages view '${staged.view}', which is not a diagram tab; stage the overview view, the data-model view or a flow.`);
     });
   return problems;
+}
+
+/** Each id that a later item repeats, once per repeat. */
+function duplicateIds(items: { id: string }[]): string[] {
+  return items.filter((item, index) => items.findIndex((other) => other.id === item.id) < index).map((item) => item.id);
 }
 
 function stagedView(step: WalkthroughStep): string | undefined {
@@ -228,11 +231,8 @@ function hunkProblems(groups: Submission["groups"], pr: PrDetails): string[] {
   const known = new Set(pr.hunks.map((hunk) => hunk.id));
   const owner = new Map<string, string>();
   const problems: string[] = [];
-  groups.forEach((group, index) => {
-    if (groups.findIndex((other) => other.id === group.id) < index) {
-      problems.push(`Duplicate group id ${group.id}.`);
-    }
-
+  duplicateIds(groups).forEach((id) => problems.push(`Duplicate group id ${id}.`));
+  groups.forEach((group) => {
     group.hunkIds.forEach((hunkId) => problems.push(...placeHunk(hunkId, group.id, known, owner)));
   });
   const missing = [...known].filter((hunkId) => !owner.has(hunkId));
