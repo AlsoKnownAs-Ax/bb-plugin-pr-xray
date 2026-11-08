@@ -103,9 +103,9 @@
     {
       "name": "Diagram Pin Target",
       "kind": "custom",
-      "description": "Atlas overlay over a server-rendered PR Lens SVG: a click target on a node or table, primary outline when hovered or selected, with a comment pin (ink when any comment is open). The SVG itself, its palette and background come from the PR Lens renderer (ADR 0001).",
+      "description": "Atlas overlay over a server-rendered PR Lens SVG: a click target on a node or table with no ring on hover or selection (as in PR Lens; only keyboard focus draws an outline), with a comment pin (ink when any comment is open). The SVG itself, its palette and background come from the PR Lens renderer (ADR 0001).",
       "html": "<div class=\"ds-target\"><span class=\"ds-pin\">2</span></div>",
-      "css": ".ds-target { position: relative; width: 160px; height: 48px; border-radius: var(--radius); outline: 2px solid var(--primary); outline-offset: 2px; } .ds-pin { position: absolute; top: -10px; right: -10px; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border: 2px solid var(--background); border-radius: 9999px 9999px 9999px 0; background: var(--foreground); color: var(--background); font: 600 11px var(--font-sans); box-shadow: var(--shadow); }"
+      "css": ".ds-target { position: relative; width: 160px; height: 48px; border-radius: var(--radius); cursor: pointer; } .ds-target:focus-visible { outline: 2px solid var(--primary); outline-offset: 12px; } .ds-pin { position: absolute; top: -10px; right: -10px; display: flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 4px; border: 2px solid var(--background); border-radius: 9999px 9999px 9999px 0; background: var(--foreground); color: var(--background); font: 600 11px var(--font-sans); box-shadow: var(--shadow); }"
     }
   ],
   "narrative": {
