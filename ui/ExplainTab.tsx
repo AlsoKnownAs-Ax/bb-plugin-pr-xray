@@ -391,7 +391,7 @@ function DiagramOverlay({
       aria-label={`${target.label}: details and comments`}
       aria-pressed={target.id === selectedId}
       // No ring on hover or selection, as in PR Lens: the node panel shows what's selected. Keyboard focus keeps one.
-      className="absolute cursor-pointer rounded-lg outline-2 outline-primary focus-visible:outline"
+      className="absolute cursor-pointer rounded-lg outline-primary focus-visible:outline-2"
       // 12px out: clears the delta badge, which rises 8px above the card (renderer BADGE_RISE).
       style={{ left: target.box.x, top: target.box.y, width: target.box.width, height: target.box.height, outlineOffset: 12 }}
       onClick={() => onSelect(target.id)}
