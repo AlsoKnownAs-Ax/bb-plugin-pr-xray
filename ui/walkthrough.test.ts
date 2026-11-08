@@ -50,8 +50,8 @@ describe("walkthrough focus box", () => {
 });
 
 describe("walkthrough veil", () => {
-  it("cuts one padded hole per focused box, not one round their union", () => {
-    expect(veilHoles(focusBoxes(selection({ nodes: ["route", "cache"] }), atlas))).toEqual([box(4, 4, 112, 52), box(194, 54, 62, 62)]);
+  it("cuts one hole per focused box, padded past the delta badge that rises 8px above a card, not one round their union", () => {
+    expect(veilHoles(focusBoxes(selection({ nodes: ["route", "cache"] }), atlas))).toEqual([box(-2, -2, 124, 64), box(188, 48, 74, 74)]);
   });
 });
 

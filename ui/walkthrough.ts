@@ -195,9 +195,10 @@ export function progressLabel(current: number | null, count: number): string {
   return `${current + 1} of ${count}`;
 }
 
-const VEIL_PAD = 6;
+// Clears the delta badge, which rises 8px above the card (renderer BADGE_RISE).
+export const FOCUS_PAD = 12;
 
 /** The holes the dimming veil leaves: each focused box with room round it. */
 export function veilHoles(boxes: Box[]): Box[] {
-  return boxes.map((b) => ({ x: b.x - VEIL_PAD, y: b.y - VEIL_PAD, width: b.width + VEIL_PAD * 2, height: b.height + VEIL_PAD * 2 }));
+  return boxes.map((b) => ({ x: b.x - FOCUS_PAD, y: b.y - FOCUS_PAD, width: b.width + FOCUS_PAD * 2, height: b.height + FOCUS_PAD * 2 }));
 }

@@ -125,7 +125,7 @@ export function DiagramCanvas({
   );
 }
 
-/** Dims everything but the focus: a veil in the canvas colour with a hole round each focused box. */
+/** Dims everything but the focus: a veil in the canvas colour with a hole round each focused box. No rim: a selected part already gets an outline, and two rings read as double. */
 function FocusVeil({ focus, width, height, background }: { focus: Box[]; width: number; height: number; background: string }) {
   const holes = veilHoles(focus);
   // A mask, not an even-odd path: overlapping holes (a lane and its nodes) must stay clear, not dim again.
@@ -139,9 +139,6 @@ function FocusVeil({ focus, width, height, background }: { focus: Box[]; width: 
         ))}
       </mask>
       <rect x={-8000} y={-8000} width={width + 16000} height={height + 16000} fill={background} fillOpacity={0.75} mask={`url(#${maskId})`} />
-      {holes.map((hole, index) => (
-        <rect key={index} {...hole} rx={10} className="fill-none stroke-primary" strokeWidth={2} vectorEffect="non-scaling-stroke" />
-      ))}
     </svg>
   );
 }
