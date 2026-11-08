@@ -105,7 +105,10 @@ export function DiagramCanvas({
         className="absolute left-0 top-0 origin-top-left"
         style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`, width: render.width, height: render.height }}
       >
-        <div ref={svgHostRef} className="[&>svg]:block" dangerouslySetInnerHTML={{ __html: render.svg }} />
+        {/* PR Lens rides a card's 16px badges 8px above it, right-aligned 7px in; this shrinks them to 14px and moves them 4px inside its top-right corner, so a focus veil at the card's box doesn't cut them. */}
+        <div
+          ref={svgHostRef}
+          className="[&>svg]:block [&_.bdg]:[transform-box:fill-box] [&_.bdg]:[transform-origin:top_right] [&_.bdg]:[transform:translate(3px,12px)_scale(0.875)]" dangerouslySetInnerHTML={{ __html: render.svg }} />
         {focus.length > 0 ? <FocusVeil focus={focus} width={render.width} height={render.height} background={render.background} /> : null}
         {overlay?.(view.scale)}
       </div>
