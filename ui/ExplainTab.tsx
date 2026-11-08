@@ -85,7 +85,11 @@ function DiagramExplain({
   const [focus, setFocus] = useState<Focus>({ kind: "all" });
   const focused = render ? focusBoxes(focus, render.atlas, tab.flow) : [];
   const show = (target: Target) => {
-    if (target.tab) setTabId(target.tab);
+    if (target.tab && target.tab !== tab.id) {
+      // The node panel belongs to its own tab; close it when switching away.
+      setSelectedId(null);
+      setTabId(target.tab);
+    }
     setFocus(target.focus);
   };
   const selectStep = (index: number | null) => {
@@ -100,14 +104,19 @@ function DiagramExplain({
     if (ref.kind === "node" || ref.kind === "table") {
       const id = partId(ref);
       const onTab = nodeTab(graph, tabs, tab.id, id);
-      return onTab
-        ? () => {
-            // The step's zoom belongs to its own tab; drop it when switching away.
-            if (onTab !== tab.id) setFocus({ kind: "all" });
-            setTabId(onTab);
-            setSelectedId(id);
-          }
-        : null;
+      if (!onTab) {
+        return null;
+      }
+
+      return () => {
+        // The step and its zoom belong to their own tab; leave them when switching away.
+        if (onTab !== tab.id) {
+          setStep(null);
+          setFocus({ kind: "all" });
+          setTabId(onTab);
+        }
+        setSelectedId(id);
+      };
     }
     const target = citeTarget(graph, tabs, ref);
     return target ? () => show(target) : null;
