@@ -87,13 +87,14 @@ function replayHunk(hunk: Hunk, range: HunkRange, newLines: string[], replay: Re
   replay.oldLines.push(...newLines.slice(replay.newIndex, gapEnd));
   replay.newIndex = gapEnd;
   const above = { old: replay.oldLines.length, new: replay.newIndex };
-  const matches = hunk.patch
+  const patchLines = hunk.patch
     .split("\n")
     .slice(1)
-    .filter((raw) => raw !== "" && !raw.startsWith("\\"))
-    .every((raw) => replayLine(raw, newLines, replay));
-  if (!matches) {
-    return null;
+    .filter((raw) => raw !== "" && !raw.startsWith("\\"));
+  for (const raw of patchLines) {
+    if (!replayLine(raw, newLines, replay)) {
+      return null;
+    }
   }
 
   return above;
