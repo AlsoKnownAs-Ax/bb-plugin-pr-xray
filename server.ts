@@ -5,6 +5,7 @@ import { z } from "zod";
 import { rpcContract } from "./shared/contract";
 import { parsePrRef, prRefKey, prRefToSubPath, REVIEW_PANEL_PATH } from "./shared/pr-ref";
 import { threadsToFix } from "./shared/fix-scope";
+import { diagramTab } from "./shared/diagram-tabs";
 import type { FixScope, PrDetails, PrRef, ReviewThread } from "./shared/schema";
 import { agentTools, REVIEW_TOOL } from "./server/agent-tools";
 import { createAnalysis, findTicketUrl } from "./server/analysis";
@@ -229,20 +230,7 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     async "diagram.addComment"({ ref, analysisId, diagramId, nodeId, body }) {
-      const record = store.analysis(analysisId);
-      const node = record?.result?.diagrams
-        .find((diagram) => diagram.id === diagramId)
-        ?.nodes.find((candidate) => candidate.id === nodeId);
-      if (!record || !node) throw new Error("That diagram node no longer exists.");
-      return comments.addDiagramComment({
-        ref,
-        headSha: record.headSha,
-        analysisId,
-        diagramId,
-        nodeId,
-        nodeLabel: node.label,
-        body,
-      });
+      return comments.addDiagramComment({ ref, analysisId, diagramId, nodeId, body });
     },
     "diagram.updateComment"({ id, body, status }) {
       const updated = store.updateComment(id, { ...(body ? { body } : {}), ...(status ? { status } : {}) });
@@ -277,10 +265,9 @@ export default async function plugin(bb: BbPluginApi) {
       if (open.length === 0) throw new Error("There are no open diagram comments.");
       const titles = new Map<string, string>();
       for (const comment of open) {
-        const diagram = store
-          .analysis(comment.analysisId ?? "")
-          ?.result?.diagrams.find((candidate) => candidate.id === comment.diagramId);
-        if (diagram && comment.diagramId) titles.set(comment.diagramId, diagram.title);
+        const graph = store.analysis(comment.analysisId ?? "")?.result?.graph;
+        const tab = graph && diagramTab(graph, comment.diagramId);
+        if (tab) titles.set(tab.id, tab.title);
       }
       return fixDiagramComments(bb, pr, open, titles);
     },

@@ -30,7 +30,7 @@ PR X-ray turns a pull request into something you can read and understand before 
 ## Capabilities and Constraints
 
 - Diff: split and unified views, viewed checkmarks, single comments, reviews, suggestions, replies, editing posted comments, resolve.
-- Explain: summary, walkthrough, "where to look closely", interactive diagrams. Diagram comments are kept in bb only.
+- Explain: summary, "where to look closely", interactive PR Lens diagrams with a walkthrough that zooms to each step. Design comments pin to nodes and tables and are kept in bb only.
 - The page stays on the commit being read. A banner offers Refresh when new commits arrive.
 - Retro feed: comment tags (manual or AI) exported with `bb pr-xray comments --json`.
 - UI must look native inside bb: reuse bb's UI kit (`components/ui`) and theme, and support light and dark.

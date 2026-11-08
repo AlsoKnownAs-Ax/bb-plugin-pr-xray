@@ -8,6 +8,7 @@ import {
   type DraftComment,
   type PrRef,
 } from "../shared/schema";
+import { commentTargets, diagramTab, diagramTabs } from "../shared/diagram-tabs";
 import { prRefKey } from "../shared/pr-ref";
 import type { Github, RawReviewComment } from "./github";
 import type { Models } from "./models";
@@ -27,6 +28,7 @@ export function stripMarker(body: string): string {
 export function createComments(deps: { bb: BbPluginApi; store: Store; github: Github; models: Models }) {
   const { bb, store, github, models } = deps;
   // Tagging worker thread id -> the one comment it may tag, and who awaits it.
+  const TAGGING_TIMEOUT_MS = 3 * 60_000;
   const taggingWorkers = new Map<string, { commentId: string; done: () => void }>();
 
   function publish(ref: PrRef) {
@@ -117,19 +119,20 @@ export function createComments(deps: { bb: BbPluginApi; store: Store; github: Gi
     publish(ref);
   }
 
-  function addDiagramComment(input: {
-    ref: PrRef;
-    headSha: string;
-    analysisId: string;
-    diagramId: string;
-    nodeId: string;
-    nodeLabel: string;
-    body: string;
-  }) {
+  /** A design comment on a node or table of one diagram tab of an analysis. */
+  function addDiagramComment(input: { ref: PrRef; analysisId: string; diagramId: string; nodeId: string; body: string }) {
+    const record = store.analysis(input.analysisId);
+    const graph = record?.result?.graph;
+    const tab = graph && diagramTab(graph, input.diagramId);
+    const nodeLabel = graph && tab && commentTargets(graph, tab).get(input.nodeId);
+    if (!record || !nodeLabel) {
+      throw new Error("That diagram node no longer exists.");
+    }
+
     const comment = store.insertComment({
       source: "diagram",
       ref: input.ref,
-      headSha: input.headSha,
+      headSha: record.headSha,
       body: input.body,
       githubCommentId: null,
       githubUrl: null,
@@ -138,18 +141,22 @@ export function createComments(deps: { bb: BbPluginApi; store: Store; github: Gi
       analysisId: input.analysisId,
       diagramId: input.diagramId,
       nodeId: input.nodeId,
-      nodeLabel: input.nodeLabel,
+      nodeLabel,
     });
     publish(input.ref);
     return comment;
   }
 
-  /** After a new analysis, pins whose node no longer exists become outdated. */
+  /** After a new analysis, pins whose node or table is no longer on their diagram tab become outdated. */
   function reconcileDiagramPins(analysisId: string) {
     const analysis = store.analysis(analysisId);
-    if (analysis?.result == null) return;
+    const graph = analysis?.result?.graph;
+    if (!analysis || !graph) {
+      return;
+    }
+
     const live = new Set(
-      analysis.result.diagrams.flatMap((diagram) => diagram.nodes.map((node) => `${diagram.id}/${node.id}`)),
+      diagramTabs(graph).flatMap((tab) => [...commentTargets(graph, tab).keys()].map((id) => `${tab.id}/${id}`)),
     );
     for (const comment of store.commentsForPr(analysis.ref, "diagram")) {
       if (comment.status === "resolved") continue;
@@ -196,7 +203,11 @@ export function createComments(deps: { bb: BbPluginApi; store: Store; github: Gi
       ...spawnModelArgs(await models.selected("tagging")),
     });
     // Resolves when the worker goes idle or fails, so the UI can show progress.
-    await new Promise<void>((done) => taggingWorkers.set(worker.id, { commentId, done }));
+    const finished = new Promise<void>((done) => taggingWorkers.set(worker.id, { commentId, done }));
+    // A missed idle event (restart, or a failure before spawn returned) would otherwise hang the call.
+    const timeout = setTimeout(() => void settleTagging(worker.id), TAGGING_TIMEOUT_MS);
+    await finished;
+    clearTimeout(timeout);
     if (store.comment(commentId)?.tag == null) throw new Error("AI tagging did not pick a tag.");
   }
 

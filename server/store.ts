@@ -2,6 +2,7 @@
 import { randomUUID } from "node:crypto";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import {
+  analysisBaseSchema,
   analysisResultSchema,
   draftCommentSchema,
   type AnalysisRecord,
@@ -113,19 +114,37 @@ function toComment(row: CommentRow): StoredComment {
   };
 }
 
-function toAnalysis(row: AnalysisRow): AnalysisRecord {
-  let result: AnalysisResult | null = null;
-  if (row.result_json !== null) {
-    const parsed = analysisResultSchema.safeParse(JSON.parse(row.result_json));
-    result = parsed.success ? parsed.data : null;
+/**
+ * A stored result, and whether it is legacy: from before PR Lens, so only the
+ * diagrams need a re-run. A legacy result keeps its base fields when they parse.
+ */
+export function parseAnalysisResult(json: string | null): Pick<AnalysisRecord, "result" | "legacy"> {
+  if (json === null) {
+    return { result: null, legacy: false };
   }
+
+  const value: unknown = JSON.parse(json);
+  const full = analysisResultSchema.safeParse(value);
+  if (full.success) {
+    return { result: full.data, legacy: false };
+  }
+
+  const base = analysisBaseSchema.safeParse(value);
+  if (!base.success) {
+    return { result: null, legacy: true };
+  }
+
+  return { result: base.data, legacy: true };
+}
+
+function toAnalysis(row: AnalysisRow): AnalysisRecord {
   return {
     id: row.id,
     ref: { owner: row.owner, repo: row.repo, number: row.number },
     headSha: row.head_sha,
     status: row.status,
     error: row.error,
-    result,
+    ...parseAnalysisResult(row.result_json),
     hunkFingerprints: row.hunk_fingerprints === null ? null : (JSON.parse(row.hunk_fingerprints) as Record<string, string>),
     workerThreadId: row.worker_thread_id,
     diffOnly: row.diff_only === 1,

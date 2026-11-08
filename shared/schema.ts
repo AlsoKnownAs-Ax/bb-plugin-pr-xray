@@ -1,6 +1,8 @@
 // Wire and storage shapes shared by the server and the app. The app imports
 // these as types only, so zod stays out of the frontend bundle unless a
 // component imports a runtime value from here.
+import { GraphDoc } from "@coldtea/pr-lens-schema";
+import type { RenderAtlas } from "@coldtea/pr-lens-renderer";
 import { z } from "zod";
 
 import { COMMENT_TAGS } from "./tags";
@@ -18,42 +20,6 @@ export type PrRef = z.infer<typeof prRefSchema>;
 
 // ---- Analysis (what the hidden worker hands back) -------------------------
 
-export const changeStatusSchema = z.enum([
-  "added",
-  "modified",
-  "removed",
-  "unchanged",
-]);
-
-export const diagramNodeSchema = z.object({
-  id: z.string().min(1).max(80),
-  label: z.string().min(1).max(120),
-  detail: z.string().max(600).optional(),
-  kind: z
-    .enum(["component", "function", "data", "external", "actor", "step"])
-    .default("component"),
-  status: changeStatusSchema.default("unchanged"),
-  groupIds: z.array(z.string()).default([]),
-});
-
-export const diagramEdgeSchema = z.object({
-  from: z.string(),
-  to: z.string(),
-  label: z.string().max(120).optional(),
-  status: changeStatusSchema.default("unchanged"),
-});
-
-export const diagramSchema = z.object({
-  id: z.string().min(1).max(80),
-  title: z.string().min(1).max(120),
-  kind: z.enum(["flow", "sequence", "data-model", "before-after", "other"]),
-  description: z.string().max(1000).default(""),
-  nodes: z.array(diagramNodeSchema).min(1).max(60),
-  edges: z.array(diagramEdgeSchema).max(120).default([]),
-});
-export type Diagram = z.infer<typeof diagramSchema>;
-export type DiagramNode = z.infer<typeof diagramNodeSchema>;
-
 export const reviewGroupSchema = z.object({
   id: z.string().min(1).max(80),
   title: z.string().min(1).max(160),
@@ -63,7 +29,8 @@ export const reviewGroupSchema = z.object({
 });
 export type ReviewGroup = z.infer<typeof reviewGroupSchema>;
 
-export const analysisResultSchema = z.object({
+/** What the analysis agent submits, besides its `graph`, which the PR Lens parser checks. */
+export const analysisBaseSchema = z.object({
   summary: z.string().min(1).max(4000),
   ticket: z
     .object({
@@ -74,16 +41,6 @@ export const analysisResultSchema = z.object({
     .default({ url: null, title: null, projectTitle: null }),
   // Ordered as a reading path: foundations first, consumers later, noise last.
   groups: z.array(reviewGroupSchema).min(1).max(40),
-  narrative: z
-    .array(
-      z.object({
-        title: z.string().min(1).max(160),
-        body: z.string().min(1).max(4000),
-        groupIds: z.array(z.string()).default([]),
-      }),
-    )
-    .min(1)
-    .max(20),
   lookClosely: z
     .array(
       z.object({
@@ -95,7 +52,23 @@ export const analysisResultSchema = z.object({
     )
     .max(12)
     .default([]),
-  diagrams: z.array(diagramSchema).min(1).max(3),
+});
+
+/** One stored render of a diagram tab in one theme. */
+export const diagramRenderSchema = z.object({
+  svg: z.string(),
+  width: z.number(),
+  height: z.number(),
+  /** The renderer's canvas colour for this theme, so the app needn't import the renderer. */
+  background: z.string(),
+  atlas: z.custom<RenderAtlas>((value) => typeof value === "object" && value !== null),
+});
+export type DiagramRender = z.infer<typeof diagramRenderSchema>;
+
+export const analysisResultSchema = analysisBaseSchema.extend({
+  graph: GraphDoc,
+  /** Diagram tab id -> its light and dark renders. */
+  renders: z.record(z.string(), z.object({ light: diagramRenderSchema, dark: diagramRenderSchema })),
 });
 export type AnalysisResult = z.infer<typeof analysisResultSchema>;
 
@@ -161,6 +134,7 @@ export const prDetailsSchema = z.object({
   /** False for a fork, or when the head repository was deleted. */
   headInBaseRepo: z.boolean(),
   baseRef: z.string(),
+  baseSha: z.string(),
   viewer: z.string(),
   isOwnPr: z.boolean(),
   /** GitHub's count, which can exceed `files`: its file listing stops at 3000. */
@@ -179,7 +153,10 @@ export const analysisRecordSchema = z.object({
   headSha: z.string(),
   status: z.enum(["running", "done", "failed"]),
   error: z.string().nullable(),
-  result: analysisResultSchema.nullable(),
+  /** For a legacy analysis, only the base fields: no graph or renders. */
+  result: analysisResultSchema.partial({ graph: true, renders: true }).nullable(),
+  /** A finished analysis stored in a format this version can no longer draw: re-run it for diagrams. */
+  legacy: z.boolean(),
   /** Hunk id -> content fingerprint when analysed. Null for analyses from before this was saved. */
   hunkFingerprints: z.record(z.string(), z.string()).nullable(),
   workerThreadId: z.string().nullable(),

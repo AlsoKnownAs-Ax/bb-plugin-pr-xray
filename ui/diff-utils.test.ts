@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ReviewGet } from "../shared/contract";
-import type { Hunk, PendingComment, PrDetails, ReviewGroup } from "../shared/schema";
-import { canKeepDraft, displayGroups, draftInDiff, filesNotShown, firstChangedLine, hunkRange, lineInHunks, sideLines } from "./diff-utils";
+import type { Hunk, PendingComment, PrDetails, PrFile, ReviewGroup, ReviewThread } from "../shared/schema";
+import { canKeepDraft, displayGroups, draftInDiff, filePatch, filesNotShown, firstChangedLine, hunkFileContext, hunkFileDiff, hunkRange, lineInHunks, sideLines, threadVisibleIn } from "./diff-utils";
 
 function hunk(header: string, body: string[]): Hunk {
   return { id: "h1", path: "a.ts", header, patch: [header, ...body].join("\n"), fingerprint: "f1" } as unknown as Hunk;
@@ -125,5 +125,77 @@ describe("hunk line helpers", () => {
 
   it("returns null when a line is outside the hunks", () => {
     expect(sideLines([sample], "RIGHT", 50, 51)).toBeNull();
+  });
+});
+
+describe("a one-file patch", () => {
+  const file = (status: string, previousPath: string | null = null) => ({ path: "b.ts", previousPath, status }) as unknown as PrFile;
+
+  it("names both paths of a rename and holds only the given hunks", () => {
+    expect(filePatch(file("renamed", "a.ts"), [sample])).toBe(`diff --git a/a.ts b/b.ts\n--- a/a.ts\n+++ b/b.ts\n${sample.patch}\n`);
+  });
+
+  it("uses /dev/null for the missing side of an added or removed file", () => {
+    expect(filePatch(file("added"), []).split("\n").slice(1, 3)).toEqual(["--- /dev/null", "+++ b/b.ts"]);
+    expect(filePatch(file("removed"), []).split("\n").slice(1, 3)).toEqual(["--- a/b.ts", "+++ /dev/null"]);
+  });
+});
+
+describe("a review thread in the diff", () => {
+  const thread = (path: string, line: number | null) => ({ path, line, side: "RIGHT" }) as unknown as ReviewThread;
+
+  it("shows on its file when its line is in the hunks", () => {
+    expect(threadVisibleIn(thread("a.ts", 11), "a.ts", [sample])).toBe(true);
+    expect(threadVisibleIn(thread("b.ts", 11), "a.ts", [sample])).toBe(false);
+    expect(threadVisibleIn(thread("a.ts", null), "a.ts", [sample])).toBe(false);
+    expect(threadVisibleIn(thread("a.ts", 99), "a.ts", [sample])).toBe(false);
+  });
+});
+
+describe("a hunk with the file above it", () => {
+  const withId = (id: string, header: string, body: string[]) => ({ ...hunk(header, body), id });
+  const change = withId("h1", "@@ -2,3 +3,4 @@", [" b", " c", "+NEW", " d"]);
+
+  it("gives both sides from the first line, with the hunk renumbered after the shorter side above it", () => {
+    const earlier = withId("h0", "@@ -1,1 +1,2 @@", [" a", "+A2"]);
+    expect(hunkFileContext("a\nA2\nb\nc\nNEW\nd\ne", [earlier, change], change)).toEqual({
+      oldText: "a\nb\nc\nd\n",
+      newText: "a\nb\nc\nNEW\nd\n",
+      patch: "@@ -2,3 +2,4 @@\n b\n c\n+NEW\n d",
+    });
+  });
+
+  it("skips no-newline markers", () => {
+    const last = withId("h1", "@@ -2,1 +2,2 @@", [" b", "+c", "\\ No newline at end of file"]);
+    expect(hunkFileContext("a\nb\nc", [last], last)?.newText).toBe("a\nb\nc\n");
+  });
+
+  it("works for a hunk that only adds lines, or only removes them", () => {
+    const added = withId("h1", "@@ -2,0 +3,1 @@", ["+NEW"]);
+    expect(hunkFileContext("a\nb\nNEW\nc", [added], added)).toEqual({ oldText: "a\nb\n", newText: "a\nb\nNEW\n", patch: "@@ -2,0 +3,1 @@\n+NEW" });
+    const removed = withId("h1", "@@ -2,1 +1,0 @@", ["-b"]);
+    expect(hunkFileContext("a\nc", [removed], removed)).toEqual({ oldText: "a\nb\n", newText: "a\n", patch: "@@ -2,1 +1,0 @@\n-b" });
+  });
+
+  it("parses into a diff that carries the code above but keeps the real line numbers", () => {
+    const file = { path: "a.ts", previousPath: null, status: "modified" } as unknown as PrFile;
+    const added = withId("h1", "@@ -2,0 +3,1 @@", ["+NEW"]);
+    const withContext = hunkFileDiff(file, [added], added, "a\nb\nNEW\nc");
+    expect(withContext.isPartial).toBe(false);
+    expect(withContext.hunks[0]?.additionStart).toBe(3);
+    const alone = hunkFileDiff(file, [added], added, null);
+    expect(alone.isPartial).toBe(true);
+    expect(alone.hunks[0]?.additionStart).toBe(3);
+    expect(hunkFileDiff(file, [added], added, "unrelated").isPartial).toBe(true);
+    const removed = withId("h1", "@@ -2,1 +1,0 @@", ["-b"]);
+    const deletion = hunkFileDiff(file, [removed], removed, "a\nc");
+    expect(deletion.isPartial).toBe(false);
+    expect(deletion.hunks[0]?.deletionStart).toBe(2);
+  });
+
+  it("is null when the file text doesn't match the hunks", () => {
+    expect(hunkFileContext("a\nb\nX\nNEW\nd", [change], change)).toBeNull();
+    expect(hunkFileContext("a", [change], change)).toBeNull();
+    expect(hunkFileContext("a\nb\nc\nNEW\nd", [change], { ...change, id: "missing" })).toBeNull();
   });
 });
