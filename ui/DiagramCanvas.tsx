@@ -1,6 +1,6 @@
 // Pan/zoom canvas for one diagram: the PR Lens SVG the server rendered, shown
 // inline. The renderer escapes model text and emits no script, so inline is safe.
-import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { usePrefersReducedMotion } from "@/components/ui/hooks/use-media-query";
 import { Icon } from "@/components/ui/icon";
@@ -60,16 +60,22 @@ export function DiagramCanvas({
     return () => container.removeEventListener("selectstart", blockSelection);
   }, []);
 
-  const onWheel = (event: WheelEvent<HTMLDivElement>) => {
-    const box = containerRef.current?.getBoundingClientRect();
-    if (!box) return;
-    if (event.ctrlKey || event.metaKey) {
-      const factor = Math.exp(-event.deltaY * 0.01);
-      setView((current) => zoomAt(current, factor, event.clientX - box.left, event.clientY - box.top));
-    } else {
-      setView((current) => ({ ...current, x: current.x - event.deltaX, y: current.y - event.deltaY }));
+  // The wheel zooms about the cursor. A native listener, because React's is passive and can't stop the page scrolling.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
     }
-  };
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const box = container.getBoundingClientRect();
+      const factor = Math.exp(-event.deltaY * wheelZoomRate(event));
+      setView((current) => zoomAt(current, factor, event.clientX - box.left, event.clientY - box.top));
+    };
+    container.addEventListener("wheel", onWheel, { passive: false });
+    return () => container.removeEventListener("wheel", onWheel);
+  }, []);
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if ((event.target as HTMLElement).closest("button")) return;
     drag.current = { x: event.clientX, y: event.clientY, vx: view.x, vy: view.y, moved: false };
@@ -93,7 +99,6 @@ export function DiagramCanvas({
       ref={containerRef}
       className="absolute inset-0 cursor-grab select-none overflow-hidden active:cursor-grabbing"
       style={{ backgroundColor: render.background }}
-      onWheel={onWheel}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -105,7 +110,10 @@ export function DiagramCanvas({
         className="absolute left-0 top-0 origin-top-left"
         style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`, width: render.width, height: render.height }}
       >
-        <div ref={svgHostRef} className="[&>svg]:block" dangerouslySetInnerHTML={{ __html: render.svg }} />
+        {/* PR Lens rides a card's 16px badges 8px above it, right-aligned 7px in; this shrinks them to 14px and moves them 4px inside its top-right corner, so a focus veil at the card's box doesn't cut them. */}
+        <div
+          ref={svgHostRef}
+          className="[&>svg]:block [&_.bdg]:[transform-box:fill-box] [&_.bdg]:[transform-origin:top_right] [&_.bdg]:[transform:translate(3px,12px)_scale(0.875)]" dangerouslySetInnerHTML={{ __html: render.svg }} />
         {focus.length > 0 ? <FocusVeil focus={focus} width={render.width} height={render.height} background={render.background} /> : null}
         {overlay?.(view.scale)}
       </div>
@@ -125,7 +133,20 @@ export function DiagramCanvas({
   );
 }
 
-/** Dims everything but the focus: a veil in the canvas colour with a hole at each focused box, as PR Lens does: no rim, no padding (its README: the badge strip above a card is context a veil may dim). */
+/** Zoom per wheel delta: a pinch (ctrl) sends small deltas, a mouse notch about 100px, or 3 lines in Firefox's line mode. */
+function wheelZoomRate(event: WheelEvent): number {
+  if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+    return 0.06;
+  }
+
+  if (event.ctrlKey) {
+    return 0.01;
+  }
+
+  return 0.002;
+}
+
+/** Dims everything but the focus: a veil in the canvas colour with a hole at each focused box, as PR Lens does: no rim. */
 function FocusVeil({ focus, width, height, background }: { focus: Box[]; width: number; height: number; background: string }) {
   // A mask, not an even-odd path: overlapping holes (a lane and its nodes) must stay clear, not dim again.
   const maskId = useId();
