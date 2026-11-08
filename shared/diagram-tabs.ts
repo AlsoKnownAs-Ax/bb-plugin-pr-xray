@@ -52,15 +52,19 @@ export function diagramTab(doc: GraphDoc, id: string | null): DiagramTab | undef
 
 /** Node and table ids a design comment can pin to on a tab, with their labels. */
 export function commentTargets(doc: GraphDoc, tab: DiagramTab): Map<string, string> {
-  const nodes = new Map(doc.nodes.map((node) => [node.id, node.label]));
-  if (tab.lens === "data-model") {
-    return new Map(doc.dataModel?.tables.map((table) => [table.id, table.label]));
-  }
+  return COMMENT_TARGETS[tab.lens](doc, tab);
+}
 
-  if (tab.lens === "data-flow") {
+function nodeLabels(doc: GraphDoc): Map<string, string> {
+  return new Map(doc.nodes.map((node) => [node.id, node.label]));
+}
+
+const COMMENT_TARGETS = {
+  architecture: nodeLabels,
+  "data-model": (doc) => new Map(doc.dataModel?.tables.map((table) => [table.id, table.label])),
+  "data-flow": (doc, tab) => {
+    const nodes = nodeLabels(doc);
     const flow = doc.flows.find((candidate) => candidate.id === tab.flow);
     return new Map(flow?.participants.map((participant) => [participant.node, participant.label ?? nodes.get(participant.node) ?? participant.node]));
-  }
-
-  return nodes;
-}
+  },
+} satisfies Record<DiagramTab["lens"], (doc: GraphDoc, tab: DiagramTab) => Map<string, string>>;
