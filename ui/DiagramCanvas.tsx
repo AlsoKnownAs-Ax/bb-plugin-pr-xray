@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import type { Box } from "@coldtea/pr-lens-renderer";
 import type { DiagramRender } from "../shared/schema";
 import { fitView, zoomAt, zoomBy } from "./canvas-view";
-import { unionBox, veilHoles } from "./walkthrough";
+import { unionBox } from "./walkthrough";
 
 export function DiagramCanvas({
   render,
@@ -125,16 +125,15 @@ export function DiagramCanvas({
   );
 }
 
-/** Dims everything but the focus: a veil in the canvas colour with a hole round each focused box. No rim: a selected part already gets an outline, and two rings read as double. */
+/** Dims everything but the focus: a veil in the canvas colour with a hole at each focused box, as PR Lens does: no rim, no padding (its README: the badge strip above a card is context a veil may dim). */
 function FocusVeil({ focus, width, height, background }: { focus: Box[]; width: number; height: number; background: string }) {
-  const holes = veilHoles(focus);
   // A mask, not an even-odd path: overlapping holes (a lane and its nodes) must stay clear, not dim again.
   const maskId = useId();
   return (
     <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={width} height={height} aria-hidden>
       <mask id={maskId} maskUnits="userSpaceOnUse" x={-8000} y={-8000} width={width + 16000} height={height + 16000}>
         <rect x={-8000} y={-8000} width={width + 16000} height={height + 16000} fill="white" />
-        {holes.map((hole, index) => (
+        {focus.map((hole, index) => (
           <rect key={index} {...hole} fill="black" />
         ))}
       </mask>

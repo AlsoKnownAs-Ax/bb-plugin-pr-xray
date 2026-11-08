@@ -14,7 +14,7 @@ import { overlayTargets, type OverlayTarget } from "./diagram-overlay";
 import { useAgentConfirmContext } from "./agent-confirm";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
-import { citeTarget, FOCUS_PAD, focusBoxes, nodeTab, stepTarget, type Focus, type Target } from "./walkthrough";
+import { citeTarget, focusBoxes, nodeTab, stepTarget, type Focus, type Target } from "./walkthrough";
 import { WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel } from "./WalkthroughPanel";
 import type { CiteRef, GraphDoc } from "@coldtea/pr-lens-schema";
 
@@ -391,8 +391,8 @@ function DiagramOverlay({
       aria-label={`${target.label}: details and comments`}
       aria-pressed={target.id === selectedId}
       className="absolute rounded-lg outline-2 outline-primary hover:outline aria-pressed:outline"
-      // The outline sits FOCUS_PAD out so it clears the delta badge on the card's top edge.
-      style={{ left: target.box.x, top: target.box.y, width: target.box.width, height: target.box.height, outlineOffset: FOCUS_PAD }}
+      // 12px out: clears the delta badge, which rises 8px above the card (renderer BADGE_RISE).
+      style={{ left: target.box.x, top: target.box.y, width: target.box.width, height: target.box.height, outlineOffset: 12 }}
       onClick={() => onSelect(target.id)}
     >
       {target.pins > 0 ? (

@@ -2,7 +2,7 @@ import type { RenderAtlas } from "@coldtea/pr-lens-renderer";
 import { describe, expect, it } from "vitest";
 import { billingOrgGraph, postmarkRefactorGraph } from "@coldtea/pr-lens-schema/examples";
 import { diagramTabs } from "../shared/diagram-tabs";
-import { citeTarget, focusBoxes, nodeTab, progressLabel, stepForKey, stepTarget, unionBox, veilHoles } from "./walkthrough";
+import { citeTarget, focusBoxes, nodeTab, progressLabel, stepForKey, stepTarget, unionBox } from "./walkthrough";
 
 const box = (x: number, y: number, width: number, height: number) => ({ x, y, width, height });
 
@@ -46,12 +46,6 @@ describe("walkthrough focus box", () => {
     expect(focusBox(selection({ messages: ["get", "miss"] }), atlas, "lookup")).toEqual(box(20, 300, 80, 50));
     expect(focusBox(selection({ messages: ["get"] }), atlas, "other")).toEqual(box(900, 900, 10, 10));
     expect(focusBox(selection({ messages: ["get"] }), atlas)).toBeNull();
-  });
-});
-
-describe("walkthrough veil", () => {
-  it("cuts one hole per focused box, padded past the delta badge that rises 8px above a card, not one round their union", () => {
-    expect(veilHoles(focusBoxes(selection({ nodes: ["route", "cache"] }), atlas))).toEqual([box(-2, -2, 124, 64), box(188, 48, 74, 74)]);
   });
 });
 
