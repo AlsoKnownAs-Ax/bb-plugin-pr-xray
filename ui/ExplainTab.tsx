@@ -182,7 +182,7 @@ function DiagramExplain({
               </div>
               <span className="ml-auto text-xs text-muted-foreground">
                 Scroll to zoom · drag to pan
-                {hasSteps ? " · ← → to step" : null}
+                {hasSteps ? " · ← → to step · Esc for all" : null}
               </span>
             </div>
             <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border">

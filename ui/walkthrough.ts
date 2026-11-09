@@ -168,8 +168,12 @@ export function unionBox(boxes: Box[]): Box | null {
   };
 }
 
-/** The step an arrow key selects (`current` null = "All"); undefined for any other key. */
-export function stepForKey(key: string, current: number | null, count: number): number | undefined {
+/** The step a key selects (`current` null = "All"): arrows step, Escape leaves the steps for All; undefined when the key does nothing. */
+export function stepForKey(key: string, current: number | null, count: number): number | null | undefined {
+  if (key === "Escape") {
+    return escapeTarget(current);
+  }
+
   if (key !== "ArrowLeft" && key !== "ArrowRight") {
     return undefined;
   }
@@ -184,6 +188,15 @@ export function stepForKey(key: string, current: number | null, count: number): 
   }
 
   return Math.min(count - 1, current + 1);
+}
+
+/** Escape on a step goes back to All; on All it is left to others (focus mode). */
+function escapeTarget(current: number | null): null | undefined {
+  if (current === null) {
+    return undefined;
+  }
+
+  return null;
 }
 
 /** The panel's step counter. */

@@ -17,7 +17,7 @@ type StepProps = {
   onSelect: (index: number | null) => void;
 };
 
-/** ← / → step through, ignoring typing and dialogs as ReviewPage's keys do. Lives outside the panel so it works collapsed. */
+/** ← / → step through and Esc goes back to All, ignoring typing and dialogs as ReviewPage's keys do. Lives outside the panel so it works collapsed. */
 export function useStepKeys({ steps, current, onSelect }: StepProps) {
   useEffect(() => {
     if (steps.length === 0) {
@@ -38,8 +38,9 @@ export function useStepKeys({ steps, current, onSelect }: StepProps) {
       onSelect(next);
       event.preventDefault();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    // Capture runs before ReviewPage's listener, so Esc on a step leaves the step, not focus mode.
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [current, onSelect, steps.length]);
 }
 
