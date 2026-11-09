@@ -1,5 +1,5 @@
 // The PR Lens walkthrough, floating over the left of the diagram canvas: a
-// numbered list of steps, stepped with the arrow keys, that collapses to a pill.
+// numbered list of steps, stepped with the arrow keys, that collapses to a button.
 import { useEffect } from "react";
 import { detailParts, type CiteRef, type WalkthroughStep } from "@coldtea/pr-lens-schema";
 import { Button } from "@/components/ui/button";
@@ -105,20 +105,15 @@ export function WalkthroughPanel({
   );
 }
 
-/** The collapsed walkthrough: where you are, and a click to open it again. */
-export function WalkthroughPill({ current, count, onExpand }: { current: number | null; count: number; onExpand: () => void }) {
+/** The collapsed walkthrough, top left: where you are, and a click to open it again. */
+export function WalkthroughButton({ current, count, onExpand }: { current: number | null; count: number; onExpand: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onExpand}
-      aria-label="Open walkthrough"
-      className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full border border-border bg-background/95 px-3 py-1.5 text-xs shadow-md hover:bg-state-hover"
-    >
-      <Icon name="Route" className="size-3.5" />
-      <span className="font-medium">Walkthrough</span>
+    // Where the open panel's header sits, and styled like the collapsed design-comments button opposite.
+    <Button size="sm" variant="outline" className="absolute left-3 top-3 bg-background shadow-md" onClick={onExpand}>
+      <Icon name="Route" />
+      Walkthrough
       <span className="text-muted-foreground">{progressLabel(current, count)}</span>
-      <Icon name="ChevronRight" className="size-3.5" />
-    </button>
+    </Button>
   );
 }
 

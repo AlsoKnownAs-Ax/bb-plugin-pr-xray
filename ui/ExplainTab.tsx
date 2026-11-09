@@ -15,7 +15,7 @@ import { useAgentConfirmContext } from "./agent-confirm";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
 import { citeTarget, focusBoxes, nodeTab, stepTarget, type Focus, type Target } from "./walkthrough";
-import { useStepKeys, WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel, WalkthroughPill } from "./WalkthroughPanel";
+import { useStepKeys, WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel, WalkthroughButton } from "./WalkthroughPanel";
 import type { CiteRef, GraphDoc } from "@coldtea/pr-lens-schema";
 
 const SEVERITY_STYLE = {
@@ -202,7 +202,7 @@ function DiagramExplain({
               {hasSteps && walkthroughOpen ? (
                 <WalkthroughPanel steps={steps} current={step} onSelect={selectStep} citeAction={citeAction} onCollapse={() => setWalkthroughOpen(false)} />
               ) : null}
-              {hasSteps && !walkthroughOpen ? <WalkthroughPill current={step} count={steps.length} onExpand={() => setWalkthroughOpen(true)} /> : null}
+              {hasSteps && !walkthroughOpen ? <WalkthroughButton current={step} count={steps.length} onExpand={() => setWalkthroughOpen(true)} /> : null}
               {drawerOpen ? (
                 // Floats over the drawing without refitting it, so opening it never moves what you're reading.
                 // Sized to its content, and stops above the zoom controls (5rem: both 12px margins plus their 44px bar and a gap).
