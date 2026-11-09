@@ -75,7 +75,9 @@ function DiagramExplain({
   const [tabId, setTabId] = useState(tabs[0]!.id);
   const tab = tabs.find((candidate) => candidate.id === tabId) ?? tabs[0]!;
   const render = renders[tab.id]?.[theme];
-  const diagramComments = data.comments.filter((comment) => comment.source === "diagram");
+  // Design comments are the author's: on someone else's PR they stay hidden (and the server refuses them).
+  const isOwnPr = data.pr.isOwnPr;
+  const diagramComments = data.comments.filter((comment) => isOwnPr && comment.source === "diagram");
   const targets = render ? overlayTargets(graph, tab, render.atlas, diagramComments) : [];
   // A node or table on the current tab, by id.
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -194,40 +196,44 @@ function DiagramExplain({
         </Explanation>
       </div>
 
-      <aside className="flex w-80 shrink-0 flex-col border-l border-border">
-        {selected ? (
-          <NodePanel
-            data={data}
-            analysis={analysis}
-            tabId={tab.id}
-            target={selected}
-            comments={diagramComments.filter((comment) => comment.diagramId === tab.id && comment.nodeId === selected.id)}
-            rpc={rpc}
-            onOpenFile={onOpenFile}
-            onClose={() => setSelectedId(null)}
-          />
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col">
-            <div className="border-b border-border p-3">
-              <div className="text-sm font-medium">Design comments</div>
-              <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
+      {/* On someone else's PR there is nothing to show until a node is picked. */}
+      {isOwnPr || selected ? (
+        <aside className="flex w-80 shrink-0 flex-col border-l border-border">
+          {selected ? (
+            <NodePanel
+              data={data}
+              analysis={analysis}
+              tabId={tab.id}
+              target={selected}
+              canComment={isOwnPr}
+              comments={diagramComments.filter((comment) => comment.diagramId === tab.id && comment.nodeId === selected.id)}
+              rpc={rpc}
+              onOpenFile={onOpenFile}
+              onClose={() => setSelectedId(null)}
+            />
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="border-b border-border p-3">
+                <div className="text-sm font-medium">Design comments</div>
+                <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
+              </div>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+                {diagramComments.length === 0 ? <p className="text-sm text-muted-foreground">No design comments yet.</p> : null}
+                <CommentList title="Open" comments={open} rpc={rpc} onSelect={selectComment} />
+                <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
+                <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={selectComment} />
+              </div>
+              {/* The right padding keeps this clear of the floating chat button. */}
+              <div className="border-t border-border p-3 pr-20">
+                <Button className="w-full" size="sm" disabled={open.length === 0} onClick={() => void fixAll()}>
+                  <Icon name="Bot" />
+                  Fix all diagram comments{open.length ? ` (${open.length})` : ""}
+                </Button>
+              </div>
             </div>
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-              {diagramComments.length === 0 ? <p className="text-sm text-muted-foreground">No design comments yet.</p> : null}
-              <CommentList title="Open" comments={open} rpc={rpc} onSelect={selectComment} />
-              <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
-              <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={selectComment} />
-            </div>
-            {/* The right padding keeps this clear of the floating chat button. */}
-            <div className="border-t border-border p-3 pr-20">
-              <Button className="w-full" size="sm" disabled={open.length === 0} onClick={() => void fixAll()}>
-                <Icon name="Bot" />
-                Fix all diagram comments{open.length ? ` (${open.length})` : ""}
-              </Button>
-            </div>
-          </div>
-        )}
-      </aside>
+          )}
+        </aside>
+      ) : null}
     </div>
   );
 }
@@ -397,7 +403,7 @@ function DiagramOverlay({
     <button
       key={target.id}
       type="button"
-      aria-label={`${target.label}: details and comments`}
+      aria-label={`${target.label}: details`}
       aria-pressed={target.id === selectedId}
       // No ring on hover or selection, as in PR Lens: the node panel shows what's selected. Keyboard focus keeps one.
       className="absolute cursor-pointer rounded-lg outline-primary focus-visible:outline-2"
@@ -427,6 +433,7 @@ function NodePanel({
   analysis,
   tabId,
   target,
+  canComment,
   comments,
   rpc,
   onOpenFile,
@@ -436,6 +443,8 @@ function NodePanel({
   analysis: AnalysisRecord;
   tabId: string;
   target: OverlayTarget;
+  /** False on someone else's PR: the panel shows the part and its files only. */
+  canComment: boolean;
   comments: StoredComment[];
   rpc: Rpc;
   onOpenFile: (path: string) => void;
@@ -471,28 +480,30 @@ function NodePanel({
           <Icon name="X" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
-        {comments.map((comment) => (
-          <DiagramCommentCard key={comment.id} comment={comment} rpc={rpc} />
-        ))}
-        <Composer
-          key={`${target.id}-${comments.length}`}
-          placeholder="What is wrong with this part of the design?"
-          autoFocus={comments.length === 0}
-          actions={[
-            {
-              label: "Comment",
-              primary: true,
-              run: async (body) => {
-                await rpc.call("diagram.addComment", { ref: data.pr.ref, analysisId: analysis.id, diagramId: tabId, nodeId: target.id, body });
+      {canComment ? (
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
+          {comments.map((comment) => (
+            <DiagramCommentCard key={comment.id} comment={comment} rpc={rpc} />
+          ))}
+          <Composer
+            key={`${target.id}-${comments.length}`}
+            placeholder="What is wrong with this part of the design?"
+            autoFocus={comments.length === 0}
+            actions={[
+              {
+                label: "Comment",
+                primary: true,
+                run: async (body) => {
+                  await rpc.call("diagram.addComment", { ref: data.pr.ref, analysisId: analysis.id, diagramId: tabId, nodeId: target.id, body });
+                },
               },
-            },
-          ]}
-        />
-        {!isCurrent ? (
-          <p className="text-[11px] text-muted-foreground">This diagram is from an older commit; re-analyse to comment on the latest design.</p>
-        ) : null}
-      </div>
+            ]}
+          />
+          {!isCurrent ? (
+            <p className="text-[11px] text-muted-foreground">This diagram is from an older commit; re-analyse to comment on the latest design.</p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

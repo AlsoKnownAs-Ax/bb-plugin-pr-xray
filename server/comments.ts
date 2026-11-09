@@ -6,6 +6,7 @@ import {
   commentTagSchema,
   type CommentTag,
   type DraftComment,
+  type PrDetails,
   type PrRef,
 } from "../shared/schema";
 import { commentTargets, diagramTab, diagramTabs } from "../shared/diagram-tabs";
@@ -25,8 +26,14 @@ export function stripMarker(body: string): string {
   return body.replace(MARKER, "");
 }
 
-export function createComments(deps: { bb: BbPluginApi; store: Store; github: Github; models: Models }) {
-  const { bb, store, github, models } = deps;
+export function createComments(deps: {
+  bb: BbPluginApi;
+  store: Store;
+  github: Github;
+  models: Models;
+  loadPr: (ref: PrRef) => Promise<PrDetails>;
+}) {
+  const { bb, store, github, models, loadPr } = deps;
   // Tagging worker thread id -> the one comment it may tag, and who awaits it.
   const TAGGING_TIMEOUT_MS = 3 * 60_000;
   const taggingWorkers = new Map<string, { commentId: string; done: () => void }>();
@@ -117,6 +124,21 @@ export function createComments(deps: { bb: BbPluginApi; store: Store; github: Gi
       if (stored) store.updateComment(stored.id, { status: resolved ? "resolved" : "open" });
     }
     publish(ref);
+  }
+
+  /** Design comments are for the PR's author: a reviewer can't change someone else's design, so they comment on GitHub. */
+  async function requireOwnPr(ref: PrRef) {
+    if (!(await loadPr(ref)).isOwnPr) {
+      throw new Error("Design comments are only available on your own PR.");
+    }
+  }
+
+  /** Throws for a design comment on someone else's PR; diff comments and missing ones pass to their own checks. */
+  async function requireOwnDesignComment(commentId: string) {
+    const comment = store.comment(commentId);
+    if (comment?.source === "diagram") {
+      await requireOwnPr(comment.ref);
+    }
   }
 
   /** A design comment on a node or table of one diagram tab of an analysis. */
@@ -251,6 +273,8 @@ export function createComments(deps: { bb: BbPluginApi; store: Store; github: Gi
     reply,
     editBody,
     setThreadResolved,
+    requireOwnPr,
+    requireOwnDesignComment,
     addDiagramComment,
     reconcileDiagramPins,
     setTag,
