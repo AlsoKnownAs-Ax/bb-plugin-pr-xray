@@ -31,3 +31,15 @@ _Avoid_: Diagram kind, view type
 **Walkthrough**:
 A short guided tour of the change: a few steps, each showing one diagram, pointing at part of it, and saying in a line what changed there.
 _Avoid_: Narrative, tour, story
+
+**Design comment**:
+A note pinned to a node or table on a diagram, saying the design is wrong there. Kept in bb only, never posted to GitHub, and only available on your own PR.
+_Avoid_: Diagram comment, node comment
+
+**Focus mode**:
+The review filling the whole window, with bb's surroundings hidden.
+_Avoid_: Full screen, zen mode
+
+**Spotlight**:
+The part of a diagram a walkthrough step (or a cite in it) zooms to, with the rest dimmed.
+_Avoid_: Focus, highlight
