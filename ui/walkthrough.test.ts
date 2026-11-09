@@ -160,6 +160,11 @@ describe("walkthrough keys", () => {
     expect(stepForKey("ArrowLeft", null, 3)).toBe(0);
   });
 
+  it("Escape goes back to All, and does nothing from All", () => {
+    expect(stepForKey("Escape", 1, 3)).toBeNull();
+    expect(stepForKey("Escape", null, 3)).toBeUndefined();
+  });
+
   it("ignore other keys", () => {
     expect(stepForKey("Enter", 1, 3)).toBeUndefined();
   });

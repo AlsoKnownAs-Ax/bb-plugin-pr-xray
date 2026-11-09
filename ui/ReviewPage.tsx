@@ -79,6 +79,8 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
+      // A key the walkthrough already took (Esc on a step) is not for focus mode.
+      if (event.defaultPrevented) return;
       if (target?.closest("input, textarea, [contenteditable=true], [role=dialog]") || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.key === "f") setFocus((value) => !value);
       else if (event.key === "Escape" && focus) setFocus(false);
