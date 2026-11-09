@@ -128,7 +128,8 @@ export function createComments(deps: {
 
   /** Design comments are for the PR's author: a reviewer can't change someone else's design, so they comment on GitHub. */
   async function requireOwnPr(ref: PrRef) {
-    if (!(await loadPr(ref)).isOwnPr) {
+    const pr = await loadPr(ref);
+    if (!pr.isOwnPr) {
       throw new Error("Design comments are only available on your own PR.");
     }
   }
