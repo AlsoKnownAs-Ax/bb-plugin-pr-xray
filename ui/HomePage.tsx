@@ -1,5 +1,5 @@
 // The panel root: open a PR and see recent reviews.
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -44,15 +44,25 @@ export function HomePage() {
   // Kept apart from the URL error so a failed list load never reads as a bad URL.
   const [listError, setListError] = useState<string | null>(null);
 
+  // Realtime reloads and retries can overlap; only the newest call may write.
+  const latestLoad = useRef(0);
   const load = useCallback(() => {
+    const id = ++latestLoad.current;
     rpc.call("review.recent").then(
       (result) => {
+        if (id !== latestLoad.current) return;
         setReviews(result.reviews);
         setListError(null);
       },
-      (cause: unknown) => setListError(errorMessage(cause)),
+      (cause: unknown) => {
+        if (id === latestLoad.current) setListError(errorMessage(cause));
+      },
     );
   }, [rpc]);
+  const retry = () => {
+    setListError(null);
+    load();
+  };
   useEffect(load, [load]);
   useRealtime("analysis-changed", load);
 
@@ -94,16 +104,17 @@ export function HomePage() {
         ) : null}
         <div className="space-y-2">
           <h2 className="text-sm font-medium">Recent reviews</h2>
-          {reviews === null && listError ? (
+          {listError ? (
             <div role="alert" className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-sm text-destructive">
               <Icon name="AlertTriangle" className="size-4 shrink-0" />
               <span className="min-w-0 flex-1">{listError}</span>
-              <Button size="sm" variant="outline" onClick={load}>
+              <Button size="sm" variant="outline" onClick={retry}>
                 Retry
               </Button>
             </div>
-          ) : reviews === null ? (
-            <RecentSkeleton />
+          ) : null}
+          {reviews === null ? (
+            listError ? null : <RecentSkeleton />
           ) : reviews.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
               No reviews yet. Use the command palette (“PR X-ray: Review a pull request”) from anywhere in bb.
@@ -129,7 +140,7 @@ export function HomePage() {
                         review.analysisStatus === "failed" && "text-destructive",
                       )}
                     >
-                      {review.analysisStatus === "running" ? <Icon name="Spinner" className="size-3 animate-spin" /> : null}
+                      {review.analysisStatus === "running" ? <Icon name="Spinner" className="size-3 motion-safe:animate-spin" /> : null}
                       {STATUS_LABEL[review.analysisStatus]}
                     </span>
                   </button>

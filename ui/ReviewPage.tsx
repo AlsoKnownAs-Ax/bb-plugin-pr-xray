@@ -168,9 +168,10 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
     return (
       // The real header's shape, so the title lands where the placeholder was.
       <div role="status" className="flex h-full min-h-0 flex-col">
-        <div className="space-y-1.5 border-b border-border px-4 py-2.5 motion-safe:animate-pulse">
-          <div className="h-3 w-56 max-w-full rounded-sm bg-muted" />
-          <div className="h-4 w-96 max-w-full rounded-sm bg-muted" />
+        {/* py-2 plus the xs (16px) and base (24px) line boxes: the real header's 56px. */}
+        <div className="border-b border-border px-4 py-2 motion-safe:animate-pulse">
+          <div className="my-0.5 h-3 w-56 max-w-full rounded-sm bg-muted" />
+          <div className="my-1 h-4 w-96 max-w-full rounded-sm bg-muted" />
         </div>
         <div className="flex flex-1 items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
           <Icon name="Spinner" className="size-4 animate-spin" />
@@ -218,6 +219,13 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
           </div>
           <h1 className="truncate text-base font-semibold">{pr.title}</h1>
         </div>
+        {/* Left of the tabs, so the flex-1 title absorbs its width on Explain and the tabs don't shift. */}
+        {tab === "diff" ? (
+          <Button size="sm" variant="ghost" onClick={() => setView(view === "unified" ? "split" : "unified")} aria-label="Toggle split view">
+            <Icon name={view === "unified" ? "Columns2" : "Rows2"} />
+            {view === "unified" ? "Split" : "Unified"}
+          </Button>
+        ) : null}
         <div role="tablist" aria-label="Review view" className="flex items-center gap-1 rounded-md border border-border p-0.5">
           {(["diff", "explain"] as const).map((value, index) => (
             <Button
@@ -235,17 +243,6 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             </Button>
           ))}
         </div>
-        {/* Hidden, not removed, on Explain so the tabs don't shift. */}
-        <Button
-          size="sm"
-          variant="ghost"
-          className={cn(tab !== "diff" && "invisible")}
-          onClick={() => setView(view === "unified" ? "split" : "unified")}
-          aria-label="Toggle split view"
-        >
-          <Icon name={view === "unified" ? "Columns2" : "Rows2"} />
-          {view === "unified" ? "Split" : "Unified"}
-        </Button>
         {current || analysis ? (
           <Button size="sm" variant="ghost" onClick={() => void reanalyse()} disabled={running} aria-label="Run the analysis again">
             <Icon name="RotateCcw" className={cn(running && "animate-spin")} />
@@ -326,7 +323,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             onReanalyse={() => void reanalyse()}
           />
         ) : running ? (
-          <div role="status" className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
             <Icon name="Spinner" className="size-6 animate-spin" />
             The explanation appears here when the analysis finishes.
           </div>
