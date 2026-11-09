@@ -14,9 +14,7 @@ export function DiagramCanvas({
   overlay,
   onBackgroundClick,
   focus = [],
-  reserveRight = 0,
   reserveLeft = 0,
-  controlsRight = 12,
 }: {
   render: DiagramRender;
   /** Drawn over the SVG in its viewBox units; gets the zoom so pins can keep their screen size. */
@@ -24,12 +22,8 @@ export function DiagramCanvas({
   onBackgroundClick?: () => void;
   /** The boxes to zoom to and leave undimmed, in the render's viewBox units. */
   focus?: Box[];
-  /** Width of a panel floating over the right edge, kept clear when fitting. */
-  reserveRight?: number;
   /** Width of a panel floating over the left edge, kept clear when fitting. */
   reserveLeft?: number;
-  /** Distance of the zoom controls from the right edge, to clear a panel over it. */
-  controlsRight?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgHostRef = useRef<HTMLDivElement>(null);
@@ -46,11 +40,11 @@ export function DiagramCanvas({
     }
 
     moved.current = false;
-    setView(fitView(box, render, unionBox(focus), reserveRight, reserveLeft));
+    setView(fitView(box, render, unionBox(focus), 0, reserveLeft));
   };
   const focusKey = JSON.stringify(focus);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useLayoutEffect(fit, [render.width, render.height, focusKey, reserveRight, reserveLeft]);
+  useLayoutEffect(fit, [render.width, render.height, focusKey, reserveLeft]);
 
   // Fit again when the canvas resizes (focus mode, the window), unless the reader has moved the view.
   const fitRef = useRef(fit);
@@ -151,7 +145,7 @@ export function DiagramCanvas({
         {focus.length > 0 ? <FocusVeil focus={focus} width={render.width} height={render.height} background={render.background} /> : null}
         {overlay?.(view.scale)}
       </div>
-      <div style={{ right: controlsRight }} className="absolute bottom-3 flex items-center gap-1 rounded-md border border-border bg-background/90 p-1 shadow-xs">
+      <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-md border border-border bg-background/90 p-1 shadow-xs">
         <Button size="icon" variant="ghost" className="size-7" onClick={() => zoom(1 / 1.2)} aria-label="Zoom out">
           <Icon name="Minus" />
         </Button>

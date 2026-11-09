@@ -26,8 +26,6 @@ const SEVERITY_STYLE = {
 
 type Result = NonNullable<AnalysisRecord["result"]>;
 
-/** The comments drawer is the walkthrough panel's size: w-80 plus its margins. */
-const DRAWER_WIDTH = WALKTHROUGH_PANEL_WIDTH;
 
 type ExplainTabProps = {
   data: ReviewGet;
@@ -199,9 +197,6 @@ function DiagramExplain({
                   overlay={(scale) => <DiagramOverlay targets={targets} selectedId={selectedId} scale={scale} onSelect={setSelectedId} />}
                   focus={focused}
                   reserveLeft={widthIf(hasSteps && walkthroughOpen, WALKTHROUGH_PANEL_WIDTH)}
-                  // Only the chosen state reserves room, so picking a node doesn't refit the drawing under you.
-                  reserveRight={widthIf(isOwnPr && commentsOpen, DRAWER_WIDTH)}
-                  controlsRight={widthIf(drawerOpen, DRAWER_WIDTH) || 12}
                 />
               ) : null}
               {hasSteps && walkthroughOpen ? (
@@ -209,8 +204,9 @@ function DiagramExplain({
               ) : null}
               {hasSteps && !walkthroughOpen ? <WalkthroughPill current={step} count={steps.length} onExpand={() => setWalkthroughOpen(true)} /> : null}
               {drawerOpen ? (
-                // Sized to its content, so a short node panel covers as little of the drawing as it can.
-                <div className="absolute right-3 top-3 flex max-h-[calc(100%-1.5rem)] w-80 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-md motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-2">
+                // Floats over the drawing without refitting it, so opening it never moves what you're reading.
+                // Sized to its content, and stops above the zoom controls (5rem: both 12px margins plus their 44px bar and a gap).
+                <div className="absolute right-3 top-3 flex max-h-[calc(100%-5rem)] w-80 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-md motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-2">
                   {selected ? (
                     <NodePanel
                       data={data}
