@@ -218,8 +218,6 @@ describe("the worker prompt", () => {
 
   // Every first submission used to be rejected for these fields, which the prompt never named.
   it("states the fields and allowed values of groups and look-closely spots", () => {
-    for (const word of ['"kind"', '"core"', '"supporting"', '"tests"', '"noise"', '"hunkIds"', '"why"', '"severity"', '"high"', '"medium"', '"low"', '"reason"', '"groupIds"']) {
-      expect(prompt).toContain(word);
-    }
+    ['"id"', '"title"', '"kind"', '"core"', '"supporting"', '"tests"', '"noise"', '"hunkIds"', '"why"', '"severity"', '"high"', '"medium"', '"low"', '"reason"', '"groupIds"'].forEach((word) => expect(prompt).toContain(word));
   });
 });

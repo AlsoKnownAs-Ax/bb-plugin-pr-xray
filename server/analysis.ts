@@ -79,8 +79,8 @@ const GRAPH_GUIDE = [
 ].join("\n");
 
 // The rules for everything but the graph, straight from the schema the submission is checked against.
-const { $schema: _, ...baseFields } = z.toJSONSchema(analysisBaseSchema, { io: "input" });
-const BASE_FIELDS_GUIDE = JSON.stringify(baseFields);
+const { $schema: _, ...baseSchema } = z.toJSONSchema(analysisBaseSchema, { io: "input" });
+const BASE_FIELDS_GUIDE = JSON.stringify(baseSchema);
 
 export function workerPrompt(input: {
   pr: PrDetails;
