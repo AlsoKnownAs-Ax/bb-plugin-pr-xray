@@ -47,7 +47,7 @@ export default async function plugin(bb: BbPluginApi) {
   const store = createStore(bb);
   const github = createGithub(async () => (await settings.get()).githubToken as string | undefined);
   const models = createModels(bb);
-  const comments = createComments({ bb, store, github, models });
+  const comments = createComments({ bb, store, github, models, loadPr });
   const analysis = createAnalysis({
     bb,
     store,
@@ -221,23 +221,28 @@ export default async function plugin(bb: BbPluginApi) {
       invalidate(ref);
       return { ok: true };
     },
-    "comment.setTag"({ commentId, tag }) {
+    async "comment.setTag"({ commentId, tag }) {
+      await comments.requireOwnDesignComment(commentId);
       comments.setTag(commentId, tag);
       return { ok: true };
     },
     async "comment.autoTag"({ commentId }) {
+      await comments.requireOwnDesignComment(commentId);
       await comments.autoTag(commentId);
       return { ok: true };
     },
     async "diagram.addComment"({ ref, analysisId, diagramId, nodeId, body }) {
+      await comments.requireOwnPr(ref);
       return comments.addDiagramComment({ ref, analysisId, diagramId, nodeId, body });
     },
-    "diagram.updateComment"({ id, body, status }) {
+    async "diagram.updateComment"({ id, body, status }) {
+      await comments.requireOwnDesignComment(id);
       const updated = store.updateComment(id, { ...(body ? { body } : {}), ...(status ? { status } : {}) });
       if (updated) comments.publish(updated.ref);
       return { ok: true };
     },
-    "diagram.deleteComment"({ id }) {
+    async "diagram.deleteComment"({ id }) {
+      await comments.requireOwnDesignComment(id);
       const existing = store.comment(id);
       store.deleteComment(id);
       if (existing) comments.publish(existing.ref);
@@ -261,6 +266,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     async "fix.allDiagram"({ ref }) {
       const pr = await loadPr(ref, true);
+      await comments.requireOwnPr(ref);
       const open = store.commentsForPr(ref, "diagram").filter((comment) => comment.status === "open");
       if (open.length === 0) throw new Error("There are no open diagram comments.");
       const titles = new Map<string, string>();

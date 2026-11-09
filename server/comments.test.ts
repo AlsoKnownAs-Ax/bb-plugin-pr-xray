@@ -332,3 +332,36 @@ describe("AI tagging", () => {
     expect(tool.parameters.safeParse({ tags: [{ commentId: "cm_1", tag: "bug" }] }).success).toBe(true);
   });
 });
+
+describe("design comments are only for the PR's author", () => {
+  const ref = { owner: "acme", repo: "web", number: 7 };
+  const saved = {
+    design: { id: "cm_design", source: "diagram", ref },
+    diff: { id: "cm_diff", source: "diff", ref },
+  } as unknown as Record<string, StoredComment>;
+
+  function setup(isOwnPr: boolean) {
+    const store = { comment: (id: string) => Object.values(saved).find((comment) => comment.id === id) ?? null };
+    const bb = { realtime: { publish: vi.fn() }, agents: { registerTool: vi.fn() }, events: { on: vi.fn() } };
+    const loadPr = vi.fn(async () => ({ isOwnPr }));
+    return createComments({ bb, store, github: {}, models: {}, loadPr } as unknown as Parameters<typeof createComments>[0]);
+  }
+
+  it("refuses design comments on someone else's PR", async () => {
+    const comments = setup(false);
+    await expect(comments.requireOwnPr(ref)).rejects.toThrow("Design comments are only available on your own PR.");
+    await expect(comments.requireOwnDesignComment("cm_design")).rejects.toThrow("Design comments are only available on your own PR.");
+  });
+
+  it("allows design comments on your own PR", async () => {
+    const comments = setup(true);
+    await expect(comments.requireOwnPr(ref)).resolves.toBeUndefined();
+    await expect(comments.requireOwnDesignComment("cm_design")).resolves.toBeUndefined();
+  });
+
+  it("leaves diff comments, and comments already gone, to their own checks", async () => {
+    const comments = setup(false);
+    await expect(comments.requireOwnDesignComment("cm_diff")).resolves.toBeUndefined();
+    await expect(comments.requireOwnDesignComment("cm_gone")).resolves.toBeUndefined();
+  });
+});
