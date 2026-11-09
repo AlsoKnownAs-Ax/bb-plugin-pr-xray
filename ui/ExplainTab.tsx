@@ -1,6 +1,6 @@
 // The visual explanation: PR Lens diagrams with pinned design comments, and
 // what to look at closely.
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { experimental_useCodeTheme as useCodeTheme, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { useAgentConfirmContext } from "./agent-confirm";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
 import { citeTarget, focusBoxes, nodeTab, stepTarget, type Focus, type Target } from "./walkthrough";
-import { WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel } from "./WalkthroughPanel";
+import { useStepKeys, WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel, WalkthroughButton } from "./WalkthroughPanel";
 import type { CiteRef, GraphDoc } from "@coldtea/pr-lens-schema";
 
 const SEVERITY_STYLE = {
@@ -25,6 +25,7 @@ const SEVERITY_STYLE = {
 } as const;
 
 type Result = NonNullable<AnalysisRecord["result"]>;
+
 
 type ExplainTabProps = {
   data: ReviewGet;
@@ -85,6 +86,8 @@ function DiagramExplain({
   const steps = graph.walkthrough?.steps ?? [];
   const [step, setStep] = useState<number | null>(null);
   const [focus, setFocus] = useState<Focus>({ kind: "all" });
+  const [commentsOpen, setCommentsOpen] = useStoredFlag("pr-xray:design-comments", true);
+  const [walkthroughOpen, setWalkthroughOpen] = useStoredFlag("pr-xray:walkthrough", true);
   const focused = render ? focusBoxes(focus, render.atlas, tab.flow) : [];
   const show = (target: Target) => {
     if (target.tab && target.tab !== tab.id) {
@@ -139,14 +142,17 @@ function DiagramExplain({
   };
 
   const open = diagramComments.filter((comment) => comment.status === "open");
-  const outdated = diagramComments.filter((comment) => comment.status === "outdated");
-  const resolved = diagramComments.filter((comment) => comment.status === "resolved");
   const selectComment = (comment: StoredComment) => {
     if (!tabs.some((candidate) => candidate.id === comment.diagramId)) return;
     setTabId(comment.diagramId!);
     setSelectedId(comment.nodeId);
     selectStep(null);
   };
+
+  useStepKeys({ steps, current: step, onSelect: selectStep });
+  const hasSteps = steps.length > 0;
+  // A picked node shows its panel even when comments are collapsed; closing the node goes back to the choice.
+  const drawerOpen = Boolean(selected) || (isOwnPr && commentsOpen);
 
   return (
     <div className="flex h-full min-h-0">
@@ -174,7 +180,10 @@ function DiagramExplain({
                   </Button>
                 ))}
               </div>
-              <span className="ml-auto text-xs text-muted-foreground">⌘/Ctrl + scroll to zoom · drag to pan</span>
+              <span className="ml-auto text-xs text-muted-foreground">
+                Scroll to zoom · drag to pan
+                {hasSteps ? " · ← → to step" : null}
+              </span>
             </div>
             <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border">
               {render ? (
@@ -187,53 +196,113 @@ function DiagramExplain({
                   }}
                   overlay={(scale) => <DiagramOverlay targets={targets} selectedId={selectedId} scale={scale} onSelect={setSelectedId} />}
                   focus={focused}
-                  reserveRight={steps.length ? WALKTHROUGH_PANEL_WIDTH : 0}
+                  reserveLeft={widthIf(hasSteps && walkthroughOpen, WALKTHROUGH_PANEL_WIDTH)}
                 />
               ) : null}
-              {steps.length ? <WalkthroughPanel steps={steps} current={step} onSelect={selectStep} citeAction={citeAction} /> : null}
+              {hasSteps && walkthroughOpen ? (
+                <WalkthroughPanel steps={steps} current={step} onSelect={selectStep} citeAction={citeAction} onCollapse={() => setWalkthroughOpen(false)} />
+              ) : null}
+              {hasSteps && !walkthroughOpen ? <WalkthroughButton current={step} count={steps.length} onExpand={() => setWalkthroughOpen(true)} /> : null}
+              {drawerOpen ? (
+                // Floats over the drawing without refitting it, so opening it never moves what you're reading.
+                // Sized to its content, and stops above the zoom controls (5rem: both 12px margins plus their 44px bar and a gap).
+                <div className="absolute right-3 top-3 flex max-h-[calc(100%-5rem)] w-80 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-md motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-right-2">
+                  {selected ? (
+                    <NodePanel
+                      data={data}
+                      analysis={analysis}
+                      tabId={tab.id}
+                      target={selected}
+                      canComment={isOwnPr}
+                      comments={diagramComments.filter((comment) => comment.diagramId === tab.id && comment.nodeId === selected.id)}
+                      rpc={rpc}
+                      onOpenFile={onOpenFile}
+                      onClose={() => setSelectedId(null)}
+                    />
+                  ) : (
+                    <DesignComments comments={diagramComments} rpc={rpc} onSelect={selectComment} onFixAll={() => void fixAll()} onClose={() => setCommentsOpen(false)} />
+                  )}
+                </div>
+              ) : null}
+              {!drawerOpen && isOwnPr ? (
+                <Button size="sm" variant="outline" className="absolute right-3 top-3 bg-background shadow-md" onClick={() => setCommentsOpen(true)}>
+                  <Icon name="MessageSquare" />
+                  Design comments{countSuffix(open.length)}
+                </Button>
+              ) : null}
             </div>
           </section>
         </Explanation>
       </div>
+    </div>
+  );
+}
 
-      {/* On someone else's PR there is nothing to show until a node is picked. */}
-      {isOwnPr || selected ? (
-        <aside className="flex w-80 shrink-0 flex-col border-l border-border">
-          {selected ? (
-            <NodePanel
-              data={data}
-              analysis={analysis}
-              tabId={tab.id}
-              target={selected}
-              canComment={isOwnPr}
-              comments={diagramComments.filter((comment) => comment.diagramId === tab.id && comment.nodeId === selected.id)}
-              rpc={rpc}
-              onOpenFile={onOpenFile}
-              onClose={() => setSelectedId(null)}
-            />
-          ) : (
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="border-b border-border p-3">
-                <div className="text-sm font-medium">Design comments</div>
-                <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
-              </div>
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-                {diagramComments.length === 0 ? <p className="text-sm text-muted-foreground">No design comments yet.</p> : null}
-                <CommentList title="Open" comments={open} rpc={rpc} onSelect={selectComment} />
-                <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
-                <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={selectComment} />
-              </div>
-              {/* The right padding keeps this clear of the floating chat button. */}
-              <div className="border-t border-border p-3 pr-20">
-                <Button className="w-full" size="sm" disabled={open.length === 0} onClick={() => void fixAll()}>
-                  <Icon name="Bot" />
-                  Fix all diagram comments{open.length ? ` (${open.length})` : ""}
-                </Button>
-              </div>
-            </div>
-          )}
-        </aside>
-      ) : null}
+/** A boolean kept in localStorage, so the choice holds across reviews. */
+function useStoredFlag(key: string, initial: boolean) {
+  const [value, setValue] = useState(() => (localStorage.getItem(key) ?? String(initial)) === "true");
+  useEffect(() => localStorage.setItem(key, String(value)), [key, value]);
+  return [value, setValue] as const;
+}
+
+function widthIf(shown: boolean, width: number): number {
+  if (!shown) {
+    return 0;
+  }
+
+  return width;
+}
+
+/** " (3)", or nothing for none. */
+function countSuffix(count: number): string {
+  if (count === 0) {
+    return "";
+  }
+
+  return ` (${count})`;
+}
+
+/** The PR's design comments by status, with the button that hands the open ones to an agent. */
+function DesignComments({
+  comments,
+  rpc,
+  onSelect,
+  onFixAll,
+  onClose,
+}: {
+  comments: StoredComment[];
+  rpc: Rpc;
+  onSelect: (comment: StoredComment) => void;
+  onFixAll: () => void;
+  onClose: () => void;
+}) {
+  const open = comments.filter((comment) => comment.status === "open");
+  const outdated = comments.filter((comment) => comment.status === "outdated");
+  const resolved = comments.filter((comment) => comment.status === "resolved");
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-start gap-2 border-b border-border p-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">Design comments</div>
+          <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
+        </div>
+        <Button size="icon" variant="ghost" className="size-7" onClick={onClose} aria-label="Collapse design comments">
+          <Icon name="X" />
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+        {comments.length === 0 ? <p className="text-sm text-muted-foreground">No design comments yet.</p> : null}
+        <CommentList title="Open" comments={open} rpc={rpc} onSelect={onSelect} />
+        <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
+        <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={onSelect} />
+      </div>
+      {/* The right padding keeps this clear of the floating chat button. */}
+      <div className="border-t border-border p-3 pr-20">
+        <Button className="w-full" size="sm" disabled={open.length === 0} onClick={onFixAll}>
+          <Icon name="Bot" />
+          Fix all design comments{countSuffix(open.length)}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -503,7 +572,9 @@ function NodePanel({
             <p className="text-[11px] text-muted-foreground">This diagram is from an older commit; re-analyse to comment on the latest design.</p>
           ) : null}
         </div>
-      ) : null}
+      ) : (
+        <p className="p-3 text-xs text-muted-foreground">Design comments are only on your own PR. Leave feedback as a review comment in the Diff tab.</p>
+      )}
     </div>
   );
 }

@@ -268,7 +268,7 @@ export default async function plugin(bb: BbPluginApi) {
       const pr = await loadPr(ref, true);
       await comments.requireOwnPr(ref);
       const open = store.commentsForPr(ref, "diagram").filter((comment) => comment.status === "open");
-      if (open.length === 0) throw new Error("There are no open diagram comments.");
+      if (open.length === 0) throw new Error("There are no open design comments.");
       const titles = new Map<string, string>();
       for (const comment of open) {
         const graph = store.analysis(comment.analysisId ?? "")?.result?.graph;
