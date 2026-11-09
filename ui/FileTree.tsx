@@ -86,8 +86,6 @@ function DirRow({ node, ...props }: RowsProps & { node: FileTreeDir }) {
         <Icon name={open ? "ChevronDown" : "ChevronRight"} className="size-3 shrink-0 text-muted-foreground" />
         <Icon name={open ? "FolderOpen" : "Folder"} fallback="Folder" className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate font-mono">{node.name}</span>
-        <Counts additions={node.additions} deletions={node.deletions} quiet />
-        <span className="w-3 shrink-0" />
       </button>
       {open ? (
         // Indent guide: one hairline per level instead of bare padding.
