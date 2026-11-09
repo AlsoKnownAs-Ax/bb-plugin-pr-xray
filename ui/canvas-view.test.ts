@@ -19,6 +19,10 @@ describe("fitting a diagram", () => {
     expect(fitView(size(688, 600), render, null, 344)).toEqual({ scale: 1.2, x: 104, y: 176 });
   });
 
+  it("keeps clear of panels on both sides", () => {
+    expect(fitView(size(1200, 600), render, null, 344, 344)).toEqual({ scale: 1.2, x: 360, y: 176 });
+  });
+
   it("shrinks to fit the narrower side, but no smaller than 10%", () => {
     expect(fitView(size(500, 304), render, null, 0).scale).toBe(1);
     expect(fitView(size(300, 600), render, null, 0)).toEqual({ scale: 0.59, x: 32, y: 237 });

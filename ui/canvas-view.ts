@@ -14,27 +14,28 @@ const INSET = { side: 32, top: 48, bottom: 56 };
 
 const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 
-/** The view that centres `focus` (or the whole render) in the canvas, keeping clear of a `reserveRight` panel. */
-export function fitView(canvas: Size, render: Size, focus: Box | null, reserveRight: number): CanvasView {
+/** The view that centres `focus` (or the whole render) in the canvas, keeping clear of panels over its left and right edges. */
+export function fitView(canvas: Size, render: Size, focus: Box | null, reserveRight: number, reserveLeft = 0): CanvasView {
   const target = focus ?? { x: 0, y: 0, width: render.width, height: render.height };
-  const width = Math.max(1, canvas.width - INSET.side - rightInset(canvas.width, reserveRight));
+  const left = sideInset(canvas.width, reserveLeft);
+  const width = Math.max(1, canvas.width - left - sideInset(canvas.width, reserveRight));
   const height = Math.max(1, canvas.height - INSET.top - INSET.bottom);
   const fits = Math.min(width / target.width, height / target.height);
   const scale = Math.min(maxFitScale(focus), Math.max(MIN_SCALE, fits));
   return {
     scale,
-    x: INSET.side + (width - target.width * scale) / 2 - target.x * scale,
+    x: left + (width - target.width * scale) / 2 - target.x * scale,
     y: INSET.top + (height - target.height * scale) / 2 - target.y * scale,
   };
 }
 
 /** A narrow canvas has no room beside the panel, so the panel just overlaps it. */
-function rightInset(canvasWidth: number, reserveRight: number): number {
-  if (reserveRight === 0 || canvasWidth <= reserveRight * 2) {
+function sideInset(canvasWidth: number, reserve: number): number {
+  if (reserve === 0 || canvasWidth <= reserve * 2) {
     return INSET.side;
   }
 
-  return reserveRight;
+  return reserve;
 }
 
 function maxFitScale(focus: Box | null): number {

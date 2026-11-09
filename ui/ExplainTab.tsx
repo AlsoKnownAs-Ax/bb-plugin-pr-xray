@@ -1,6 +1,6 @@
 // The visual explanation: PR Lens diagrams with pinned design comments, and
 // what to look at closely.
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { experimental_useCodeTheme as useCodeTheme, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { useAgentConfirmContext } from "./agent-confirm";
 import { SafeMarkdown } from "./SafeMarkdown";
 import { errorMessage, type ReviewGet, type Rpc } from "./useReview";
 import { citeTarget, focusBoxes, nodeTab, stepTarget, type Focus, type Target } from "./walkthrough";
-import { WALKTHROUGH_PANEL_WIDTH, WalkthroughPanel } from "./WalkthroughPanel";
+import { useStepKeys, WALKTHROUGH_PANEL_WIDTH, WalkthroughCaption, WalkthroughPanel, WalkthroughPill } from "./WalkthroughPanel";
 import type { CiteRef, GraphDoc } from "@coldtea/pr-lens-schema";
 
 const SEVERITY_STYLE = {
@@ -25,6 +25,9 @@ const SEVERITY_STYLE = {
 } as const;
 
 type Result = NonNullable<AnalysisRecord["result"]>;
+
+/** The comments drawer is the walkthrough panel's size: w-80 plus its margins. */
+const DRAWER_WIDTH = WALKTHROUGH_PANEL_WIDTH;
 
 type ExplainTabProps = {
   data: ReviewGet;
@@ -85,6 +88,10 @@ function DiagramExplain({
   const steps = graph.walkthrough?.steps ?? [];
   const [step, setStep] = useState<number | null>(null);
   const [focus, setFocus] = useState<Focus>({ kind: "all" });
+  // shortcut: POC switch between layouts B (floating drawer) and C (caption bar + sheet); delete once one is picked (#40).
+  const [layoutC, setLayoutC] = useStoredFlag("pr-xray:poc-layout-c", false);
+  const [commentsOpen, setCommentsOpen] = useStoredFlag("pr-xray:design-comments", true);
+  const [walkthroughOpen, setWalkthroughOpen] = useStoredFlag("pr-xray:walkthrough", true);
   const focused = render ? focusBoxes(focus, render.atlas, tab.flow) : [];
   const show = (target: Target) => {
     if (target.tab && target.tab !== tab.id) {
@@ -139,14 +146,56 @@ function DiagramExplain({
   };
 
   const open = diagramComments.filter((comment) => comment.status === "open");
-  const outdated = diagramComments.filter((comment) => comment.status === "outdated");
-  const resolved = diagramComments.filter((comment) => comment.status === "resolved");
   const selectComment = (comment: StoredComment) => {
     if (!tabs.some((candidate) => candidate.id === comment.diagramId)) return;
     setTabId(comment.diagramId!);
     setSelectedId(comment.nodeId);
     selectStep(null);
   };
+
+  useStepKeys({ steps, current: step, onSelect: selectStep });
+  const hasSteps = steps.length > 0;
+  // A picked node shows its panel even when comments are collapsed; closing the node goes back to the choice.
+  const panelOpen = Boolean(selected) || (isOwnPr && commentsOpen);
+  const toggleComments = () => {
+    setSelectedId(null);
+    setCommentsOpen(!commentsOpen);
+  };
+  const renderPanel = () => {
+    if (selected) {
+      return (
+        <NodePanel
+          data={data}
+          analysis={analysis}
+          tabId={tab.id}
+          target={selected}
+          canComment={isOwnPr}
+          row={layoutC}
+          comments={diagramComments.filter((comment) => comment.diagramId === tab.id && comment.nodeId === selected.id)}
+          rpc={rpc}
+          onOpenFile={onOpenFile}
+          onClose={() => setSelectedId(null)}
+        />
+      );
+    }
+
+    return <DesignComments comments={diagramComments} rpc={rpc} grid={layoutC} onSelect={selectComment} onFixAll={() => void fixAll()} onClose={() => setCommentsOpen(false)} />;
+  };
+  const canvas = (props: { reserveLeft?: number; reserveRight?: number; controlsRight?: number; refitKey?: string }) =>
+    render ? (
+      <DiagramCanvas
+        key={tab.id}
+        render={render}
+        onBackgroundClick={() => {
+          setSelectedId(null);
+          selectStep(null);
+        }}
+        overlay={(scale) => <DiagramOverlay targets={targets} selectedId={selectedId} scale={scale} onSelect={setSelectedId} />}
+        focus={focused}
+        {...props}
+      />
+    ) : null;
+  const pill = <WalkthroughPill current={step} count={steps.length} onExpand={() => setWalkthroughOpen(true)} />;
 
   return (
     <div className="flex h-full min-h-0">
@@ -175,65 +224,142 @@ function DiagramExplain({
                 ))}
               </div>
               <span className="ml-auto text-xs text-muted-foreground">⌘/Ctrl + scroll to zoom · drag to pan</span>
-            </div>
-            <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border">
-              {render ? (
-                <DiagramCanvas
-                  key={tab.id}
-                  render={render}
-                  onBackgroundClick={() => {
-                    setSelectedId(null);
-                    selectStep(null);
-                  }}
-                  overlay={(scale) => <DiagramOverlay targets={targets} selectedId={selectedId} scale={scale} onSelect={setSelectedId} />}
-                  focus={focused}
-                  reserveRight={steps.length ? WALKTHROUGH_PANEL_WIDTH : 0}
-                />
-              ) : null}
-              {steps.length ? <WalkthroughPanel steps={steps} current={step} onSelect={selectStep} citeAction={citeAction} /> : null}
-            </div>
-          </section>
-        </Explanation>
-      </div>
-
-      {/* On someone else's PR there is nothing to show until a node is picked. */}
-      {isOwnPr || selected ? (
-        <aside className="flex w-80 shrink-0 flex-col border-l border-border">
-          {selected ? (
-            <NodePanel
-              data={data}
-              analysis={analysis}
-              tabId={tab.id}
-              target={selected}
-              canComment={isOwnPr}
-              comments={diagramComments.filter((comment) => comment.diagramId === tab.id && comment.nodeId === selected.id)}
-              rpc={rpc}
-              onOpenFile={onOpenFile}
-              onClose={() => setSelectedId(null)}
-            />
-          ) : (
-            <div className="flex min-h-0 flex-1 flex-col">
-              <div className="border-b border-border p-3">
-                <div className="text-sm font-medium">Design comments</div>
-                <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
-              </div>
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
-                {diagramComments.length === 0 ? <p className="text-sm text-muted-foreground">No design comments yet.</p> : null}
-                <CommentList title="Open" comments={open} rpc={rpc} onSelect={selectComment} />
-                <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} />
-                <CommentList title="Resolved" comments={resolved} rpc={rpc} onSelect={selectComment} />
-              </div>
-              {/* The right padding keeps this clear of the floating chat button. */}
-              <div className="border-t border-border p-3 pr-20">
-                <Button className="w-full" size="sm" disabled={open.length === 0} onClick={() => void fixAll()}>
-                  <Icon name="Bot" />
-                  Fix all diagram comments{open.length ? ` (${open.length})` : ""}
+              {layoutC && isOwnPr ? <CommentsToggle count={open.length} pressed={panelOpen} onClick={toggleComments} /> : null}
+              <div className="flex items-center gap-1 rounded-md border border-dashed border-border p-0.5 text-xs" title="Proof of concept: compare layouts">
+                <span className="px-1 text-muted-foreground">POC</span>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" aria-pressed={!layoutC} onClick={() => setLayoutC(false)}>
+                  B · Drawer
+                </Button>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" aria-pressed={layoutC} onClick={() => setLayoutC(true)}>
+                  C · Sheet
                 </Button>
               </div>
             </div>
-          )}
-        </aside>
-      ) : null}
+            {layoutC ? (
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border">
+                <div className="relative min-h-0 flex-1">
+                  {/* The sheet and caption take height from the canvas, so fit again when they open or close. */}
+                  {canvas({ refitKey: `${isOwnPr && commentsOpen}-${walkthroughOpen}` })}
+                  {hasSteps && !walkthroughOpen ? pill : null}
+                </div>
+                {panelOpen ? <div className="flex max-h-[45%] min-h-0 shrink-0 flex-col border-t border-border">{renderPanel()}</div> : null}
+                {hasSteps && walkthroughOpen ? (
+                  <WalkthroughCaption steps={steps} current={step} onSelect={selectStep} onCollapse={() => setWalkthroughOpen(false)} />
+                ) : null}
+              </div>
+            ) : (
+              <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border">
+                {canvas({
+                  reserveLeft: widthIf(hasSteps && walkthroughOpen, WALKTHROUGH_PANEL_WIDTH),
+                  // Only the chosen state reserves room, so picking a node doesn't refit the drawing under you.
+                  reserveRight: widthIf(isOwnPr && commentsOpen, DRAWER_WIDTH),
+                  controlsRight: widthIf(panelOpen, DRAWER_WIDTH) || 12,
+                })}
+                {hasSteps && walkthroughOpen ? (
+                  <WalkthroughPanel
+                    className="bottom-3 left-3 top-3"
+                    steps={steps}
+                    current={step}
+                    onSelect={selectStep}
+                    citeAction={citeAction}
+                    onCollapse={() => setWalkthroughOpen(false)}
+                  />
+                ) : null}
+                {hasSteps && !walkthroughOpen ? pill : null}
+                {panelOpen ? (
+                  <div className="absolute bottom-3 right-3 top-3 flex w-80 flex-col overflow-hidden rounded-lg border border-border bg-background shadow-md">
+                    {renderPanel()}
+                  </div>
+                ) : null}
+                {!panelOpen && isOwnPr ? (
+                  <CommentsToggle className="absolute right-3 top-3 bg-background/95 shadow-md" count={open.length} pressed={false} onClick={toggleComments} />
+                ) : null}
+              </div>
+            )}
+          </section>
+        </Explanation>
+      </div>
+    </div>
+  );
+}
+
+/** A boolean kept in localStorage, so the choice holds across reviews. */
+function useStoredFlag(key: string, initial: boolean) {
+  const [value, setValue] = useState(() => (localStorage.getItem(key) ?? String(initial)) === "true");
+  useEffect(() => localStorage.setItem(key, String(value)), [key, value]);
+  return [value, setValue] as const;
+}
+
+function widthIf(shown: boolean, width: number): number {
+  if (!shown) {
+    return 0;
+  }
+
+  return width;
+}
+
+/** " (3)", or nothing for none. */
+function countSuffix(count: number): string {
+  if (count === 0) {
+    return "";
+  }
+
+  return ` (${count})`;
+}
+
+function CommentsToggle({ count, pressed, onClick, className }: { count: number; pressed: boolean; onClick: () => void; className?: string }) {
+  return (
+    <Button size="sm" variant="outline" className={className} aria-pressed={pressed} onClick={onClick}>
+      <Icon name="MessageSquare" />
+      Design comments{countSuffix(count)}
+    </Button>
+  );
+}
+
+/** The PR's design comments by status, with the button that hands the open ones to an agent. */
+function DesignComments({
+  comments,
+  rpc,
+  grid,
+  onSelect,
+  onFixAll,
+  onClose,
+}: {
+  comments: StoredComment[];
+  rpc: Rpc;
+  /** Lay the cards side by side, for a wide sheet. */
+  grid: boolean;
+  onSelect: (comment: StoredComment) => void;
+  onFixAll: () => void;
+  onClose: () => void;
+}) {
+  const open = comments.filter((comment) => comment.status === "open");
+  const outdated = comments.filter((comment) => comment.status === "outdated");
+  const resolved = comments.filter((comment) => comment.status === "resolved");
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-start gap-2 border-b border-border p-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">Design comments</div>
+          <p className="text-xs text-muted-foreground">Kept in bb only. Comment on a node when the design is wrong.</p>
+        </div>
+        <Button size="icon" variant="ghost" className="size-7" onClick={onClose} aria-label="Collapse design comments">
+          <Icon name="X" />
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3">
+        {comments.length === 0 ? <p className="text-sm text-muted-foreground">No design comments yet.</p> : null}
+        <CommentList title="Open" comments={open} rpc={rpc} grid={grid} onSelect={onSelect} />
+        <CommentList title="Outdated" hint="The node no longer exists in the latest analysis." comments={outdated} rpc={rpc} grid={grid} />
+        <CommentList title="Resolved" comments={resolved} rpc={rpc} grid={grid} onSelect={onSelect} />
+      </div>
+      {/* The right padding keeps this clear of the floating chat button. */}
+      <div className="border-t border-border p-3 pr-20">
+        <Button className="w-full" size="sm" disabled={open.length === 0} onClick={onFixAll}>
+          <Icon name="Bot" />
+          Fix all diagram comments{countSuffix(open.length)}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -323,12 +449,14 @@ function CommentList({
   hint,
   comments,
   rpc,
+  grid,
   onSelect,
 }: {
   title: string;
   hint?: string;
   comments: StoredComment[];
   rpc: Rpc;
+  grid: boolean;
   onSelect?: (comment: StoredComment) => void;
 }) {
   if (comments.length === 0) return null;
@@ -338,9 +466,11 @@ function CommentList({
         {title} ({comments.length})
       </div>
       {hint ? <p className="text-[11px] text-muted-foreground">{hint}</p> : null}
-      {comments.map((comment) => (
-        <DiagramCommentCard key={comment.id} comment={comment} rpc={rpc} onSelect={onSelect} />
-      ))}
+      <div className={cn("space-y-2", grid && "grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-2 space-y-0")}>
+        {comments.map((comment) => (
+          <DiagramCommentCard key={comment.id} comment={comment} rpc={rpc} onSelect={onSelect} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -434,6 +564,7 @@ function NodePanel({
   tabId,
   target,
   canComment,
+  row,
   comments,
   rpc,
   onOpenFile,
@@ -445,6 +576,8 @@ function NodePanel({
   target: OverlayTarget;
   /** False on someone else's PR: the panel shows the part and its files only. */
   canComment: boolean;
+  /** Details beside the comments, for a wide, short sheet. */
+  row: boolean;
   comments: StoredComment[];
   rpc: Rpc;
   onOpenFile: (path: string) => void;
@@ -452,8 +585,8 @@ function NodePanel({
 }) {
   const isCurrent = analysis.headSha === data.pr.headSha;
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-start gap-2 border-b border-border p-3">
+    <div className={cn("flex min-h-0 flex-1 flex-col", row && "flex-row")}>
+      <div className={cn("flex items-start gap-2 border-b border-border p-3", row && "w-72 shrink-0 border-b-0 border-r")}>
         <div className="min-w-0 flex-1">
           <div className="text-[11px] uppercase text-muted-foreground">
             {target.kind} · {target.delta}
@@ -503,7 +636,9 @@ function NodePanel({
             <p className="text-[11px] text-muted-foreground">This diagram is from an older commit; re-analyse to comment on the latest design.</p>
           ) : null}
         </div>
-      ) : null}
+      ) : (
+        <p className="p-3 text-xs text-muted-foreground">Design comments are only on your own PR. Leave feedback as a review comment in the Diff tab.</p>
+      )}
     </div>
   );
 }
