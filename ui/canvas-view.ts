@@ -11,16 +11,16 @@ const MAX_SCALE = 4;
 const MAX_FIT_SCALE = { whole: 1.2, focus: 1.6 };
 /** Room fitting leaves around the drawing. */
 const INSET = { side: 32, top: 48, bottom: 56 };
-/** Panels only push the drawing aside while at least a panel's width (w-80) stays free between them. */
+/** The panel only pushes the drawing aside while at least a panel's width (w-80) stays free beside it. */
 const MIN_FREE_WIDTH = 320;
 
 const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 
-/** The view that centres `focus` (or the whole render) in the canvas, keeping clear of panels over its left and right edges. */
-export function fitView(canvas: Size, render: Size, focus: Box | null, reserveRight: number, reserveLeft = 0): CanvasView {
+/** The view that centres `focus` (or the whole render) in the canvas, keeping clear of a `reserveLeft` panel. */
+export function fitView(canvas: Size, render: Size, focus: Box | null, reserveLeft: number): CanvasView {
   const target = focus ?? { x: 0, y: 0, width: render.width, height: render.height };
-  const { left, right } = sideInsets(canvas.width, reserveLeft, reserveRight);
-  const width = Math.max(1, canvas.width - left - right);
+  const left = leftInset(canvas.width, reserveLeft);
+  const width = Math.max(1, canvas.width - left - INSET.side);
   const height = Math.max(1, canvas.height - INSET.top - INSET.bottom);
   const fits = Math.min(width / target.width, height / target.height);
   const scale = Math.min(maxFitScale(focus), Math.max(MIN_SCALE, fits));
@@ -31,15 +31,13 @@ export function fitView(canvas: Size, render: Size, focus: Box | null, reserveRi
   };
 }
 
-/** A narrow canvas has no room beside the panels, so they just overlap the drawing. */
-function sideInsets(canvasWidth: number, reserveLeft: number, reserveRight: number): { left: number; right: number } {
-  const left = reserveLeft || INSET.side;
-  const right = reserveRight || INSET.side;
-  if (canvasWidth - left - right < MIN_FREE_WIDTH) {
-    return { left: INSET.side, right: INSET.side };
+/** A narrow canvas has no room beside the panel, so the panel just overlaps the drawing. */
+function leftInset(canvasWidth: number, reserveLeft: number): number {
+  if (reserveLeft === 0 || canvasWidth - reserveLeft - INSET.side < MIN_FREE_WIDTH) {
+    return INSET.side;
   }
 
-  return { left, right };
+  return reserveLeft;
 }
 
 function maxFitScale(focus: Box | null): number {

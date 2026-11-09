@@ -22,7 +22,7 @@ export function DiagramCanvas({
   onBackgroundClick?: () => void;
   /** The boxes to zoom to and leave undimmed, in the render's viewBox units. */
   focus?: Box[];
-  /** Width of a panel floating over the left edge, kept clear when fitting. */
+  /** Width of a panel floating over the left edge, kept clear when fitting. Changing it alone doesn't refit, so toggling the panel never moves the drawing. */
   reserveLeft?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -40,11 +40,11 @@ export function DiagramCanvas({
     }
 
     moved.current = false;
-    setView(fitView(box, render, unionBox(focus), 0, reserveLeft));
+    setView(fitView(box, render, unionBox(focus), reserveLeft));
   };
   const focusKey = JSON.stringify(focus);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useLayoutEffect(fit, [render.width, render.height, focusKey, reserveLeft]);
+  useLayoutEffect(fit, [render.width, render.height, focusKey]);
 
   // Fit again when the canvas resizes (focus mode, the window), unless the reader has moved the view.
   const fitRef = useRef(fit);

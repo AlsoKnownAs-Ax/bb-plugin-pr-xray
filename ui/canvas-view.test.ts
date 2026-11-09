@@ -13,16 +13,11 @@ describe("fitting a diagram", () => {
     expect(fitView(size(1000, 600), render, { x: 100, y: 50, width: 100, height: 50 }, 0)).toEqual({ scale: 1.6, x: 260, y: 176 });
   });
 
-  it("keeps clear of a panel on the right when the canvas is wide enough", () => {
-    expect(fitView(size(1000, 600), render, null, 344)).toEqual({ scale: 1.2, x: 104, y: 176 });
+  it("keeps clear of a panel on the left when the canvas is wide enough", () => {
+    expect(fitView(size(1000, 600), render, null, 344)).toEqual({ scale: 1.2, x: 416, y: 176 });
+    // Under a panel's width (320px) would stay free beside it, so it overlaps instead.
     expect(fitView(size(600, 600), render, null, 344)).toEqual({ scale: 1.2, x: 60, y: 176 });
     expect(fitView(size(688, 600), render, null, 344)).toEqual({ scale: 1.2, x: 104, y: 176 });
-  });
-
-  it("keeps clear of panels on both sides", () => {
-    expect(fitView(size(1200, 600), render, null, 344, 344)).toEqual({ scale: 1.2, x: 360, y: 176 });
-    // 966 - 688 leaves under 320px between them, so both overlap instead.
-    expect(fitView(size(966, 600), render, null, 344, 344)).toEqual({ scale: 1.2, x: 243, y: 176 });
   });
 
   it("shrinks to fit the narrower side, but no smaller than 10%", () => {
