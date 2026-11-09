@@ -80,7 +80,7 @@ export function ReportBugButton() {
 
 const FOOTER_LINK = cn("rounded-sm underline-offset-2 hover:text-foreground hover:underline", FOCUS);
 
-/** Settings footer: version, a direct "Report a bug" link and the repo link. */
+/** Settings footer: version, a direct "Report a bug" link and a "Star on GitHub" repo link. */
 export function ReportBugFooter() {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
@@ -96,8 +96,9 @@ export function ReportBugFooter() {
       </span>
       <span className="flex items-center gap-x-2 whitespace-nowrap">
         <span aria-hidden="true">·</span>
-        <a href={REPO_URL} target="_blank" rel="noreferrer" className={FOOTER_LINK}>
-          GitHub
+        <a href={REPO_URL} target="_blank" rel="noreferrer" className={cn("flex items-center gap-1", FOOTER_LINK)}>
+          <Icon name="Star" className="size-3" />
+          Star on GitHub
         </a>
       </span>
     </div>
