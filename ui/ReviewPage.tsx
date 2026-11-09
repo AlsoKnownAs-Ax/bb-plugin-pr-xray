@@ -154,7 +154,8 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
   if (error && !data) {
     return (
       <div className="p-6">
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="flex items-start gap-2 text-sm text-destructive">
+          <Icon name="AlertTriangle" className="mt-0.5 size-4 shrink-0" />
           {error}
         </p>
         <Button className="mt-3" size="sm" variant="outline" onClick={refetch}>
@@ -164,7 +165,19 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
     );
   }
   if (!data) {
-    return <div className="p-6 text-sm text-muted-foreground">Loading pull request…</div>;
+    return (
+      // The real header's shape, so the title lands where the placeholder was.
+      <div role="status" className="flex h-full min-h-0 flex-col">
+        <div className="space-y-1.5 border-b border-border px-4 py-2.5 motion-safe:animate-pulse">
+          <div className="h-3 w-56 max-w-full rounded-sm bg-muted" />
+          <div className="h-4 w-96 max-w-full rounded-sm bg-muted" />
+        </div>
+        <div className="flex flex-1 items-center justify-center gap-2 p-6 text-sm text-muted-foreground">
+          <Icon name="Spinner" className="size-4 animate-spin" />
+          Loading pull request…
+        </div>
+      </div>
+    );
   }
 
   const { pr, current } = data;
@@ -222,12 +235,17 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             </Button>
           ))}
         </div>
-        {tab === "diff" ? (
-          <Button size="sm" variant="ghost" onClick={() => setView(view === "unified" ? "split" : "unified")} aria-label="Toggle split view">
-            <Icon name={view === "unified" ? "Columns2" : "Rows2"} />
-            {view === "unified" ? "Split" : "Unified"}
-          </Button>
-        ) : null}
+        {/* Hidden, not removed, on Explain so the tabs don't shift. */}
+        <Button
+          size="sm"
+          variant="ghost"
+          className={cn(tab !== "diff" && "invisible")}
+          onClick={() => setView(view === "unified" ? "split" : "unified")}
+          aria-label="Toggle split view"
+        >
+          <Icon name={view === "unified" ? "Columns2" : "Rows2"} />
+          {view === "unified" ? "Split" : "Unified"}
+        </Button>
         {current || analysis ? (
           <Button size="sm" variant="ghost" onClick={() => void reanalyse()} disabled={running} aria-label="Run the analysis again">
             <Icon name="RotateCcw" className={cn(running && "animate-spin")} />
@@ -308,7 +326,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
             onReanalyse={() => void reanalyse()}
           />
         ) : running ? (
-          <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+          <div role="status" className="flex h-full flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
             <Icon name="Spinner" className="size-6 animate-spin" />
             The explanation appears here when the analysis finishes.
           </div>
@@ -375,7 +393,10 @@ function AnalysisProgress({
         ) : null}
       </div>
       <div className="h-0.5 overflow-hidden bg-muted">
-        <div className="h-full bg-primary transition-[width] duration-1000 ease-linear" style={{ width: `${Math.round(progress * 95)}%` }} />
+        <div
+          className="h-full origin-left bg-primary transition-transform duration-1000 ease-linear motion-reduce:transition-none"
+          style={{ transform: `scaleX(${(progress * 0.95).toFixed(3)})` }}
+        />
       </div>
     </div>
   );
