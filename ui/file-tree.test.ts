@@ -34,16 +34,6 @@ describe("file tree", () => {
     expect(rows(buildFileTree([file("a/b/c.ts"), file("a/d.ts")]))).toEqual(["a", "  b", "    c.ts", "  d.ts"]);
   });
 
-  it("sums the additions and deletions of everything under a folder", () => {
-    const [src] = buildFileTree([
-      file("src/a.ts", { additions: 3, deletions: 1 }),
-      file("src/deep/er/b.ts", { additions: 10, deletions: 0 }),
-      file("src/deep/er/c.ts", { additions: 0, deletions: 5 }),
-    ]);
-    expect(src).toMatchObject({ kind: "dir", additions: 13, deletions: 6 });
-    expect(src?.kind === "dir" && src.children[0]).toMatchObject({ name: "deep/er", path: "src/deep/er", additions: 10, deletions: 5 });
-  });
-
   it("places a renamed file under its new path, with the old path in its tooltip", () => {
     const moved = file("new/name.ts", { status: "renamed", previousPath: "old/name.ts" });
     expect(rows(buildFileTree([moved]))).toEqual(["new", "  name.ts"]);

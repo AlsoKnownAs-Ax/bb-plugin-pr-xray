@@ -2,7 +2,7 @@
 import type { Hunk, PrFile } from "../shared/schema";
 
 /** `path` is the deepest folder of a compacted row, so it stays a stable key. */
-export type FileTreeDir = { kind: "dir"; name: string; path: string; children: FileTreeNode[]; additions: number; deletions: number };
+export type FileTreeDir = { kind: "dir"; name: string; path: string; children: FileTreeNode[] };
 export type FileTreeFile = { kind: "file"; name: string; file: PrFile };
 export type FileTreeNode = FileTreeDir | FileTreeFile;
 
@@ -56,7 +56,7 @@ export const isPatchless = (file: PrFile) => file.hunkIds.length === 0;
 
 export const notListedLabel = (count: number) => `${count} more file${count === 1 ? "" : "s"} not listed`;
 
-const dir = (name: string, path: string): FileTreeDir => ({ kind: "dir", name, path, children: [], additions: 0, deletions: 0 });
+const dir = (name: string, path: string): FileTreeDir => ({ kind: "dir", name, path, children: [] });
 
 function finish(node: FileTreeDir): FileTreeDir {
   const children = node.children.map((child) => (child.kind === "dir" ? finish(child) : child));
@@ -64,13 +64,7 @@ function finish(node: FileTreeDir): FileTreeDir {
   // Like GitHub, a folder holding just one folder shares its row: `src/server/utils`. Never the root.
   if (node.path !== "" && children.length === 1 && only?.kind === "dir") return { ...only, name: `${node.name}/${only.name}` };
   children.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "dir" ? -1 : 1));
-  const counts = children.map((child) => (child.kind === "dir" ? child : child.file));
-  return {
-    ...node,
-    children,
-    additions: counts.reduce((sum, child) => sum + child.additions, 0),
-    deletions: counts.reduce((sum, child) => sum + child.deletions, 0),
-  };
+  return { ...node, children };
 }
 
 /** Paths of files whose every hunk is viewed, across all groups. A file without hunks is never viewed. */
