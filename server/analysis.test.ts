@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrDetails } from "../shared/schema";
-import { annotatedDiff, checkAnalysis, findTicketUrl } from "./analysis";
+import { annotatedDiff, checkAnalysis, findTicketUrl, workerPrompt } from "./analysis";
 
 const pr = { hunks: [{ id: "h1" }] } as unknown as PrDetails;
 
@@ -204,5 +204,20 @@ describe("the annotated diff", () => {
       "=== FILE logo.png [added, +0/-0]",
       "(no textual patch: binary or too large)",
     ]);
+  });
+});
+
+describe("the worker prompt", () => {
+  const prompt = workerPrompt({
+    pr: { ...pr, ref: { owner: "acme", repo: "web", number: 1 }, title: "t", body: "", headRef: "h", baseRef: "b", baseSha: "1", headSha: "2" } as PrDetails,
+    diffPath: "d.diff",
+    ticketUrl: null,
+    settings: { ticketUrlPattern: "", notionProjectProperty: "Project" },
+    hasRepo: false,
+  });
+
+  // Every first submission used to be rejected for these fields, which the prompt never named.
+  it("states the fields and allowed values of groups and look-closely spots", () => {
+    ['"id"', '"title"', '"kind"', '"core"', '"supporting"', '"tests"', '"noise"', '"hunkIds"', '"why"', '"severity"', '"high"', '"medium"', '"low"', '"reason"', '"groupIds"'].forEach((word) => expect(prompt).toContain(word));
   });
 });

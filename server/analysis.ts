@@ -78,7 +78,11 @@ const GRAPH_GUIDE = [
   "detail is { text (<=240), cites: [1-8 of { text, ref }] }: each cite's text is an exact substring of detail.text, in order, and ref names a node ({ kind: \"node\", node }), a flow step ({ kind: \"message\", flow, message }), a view, a flow or a file ({ kind: \"file\", path }). Cite the nodes, flow steps and files the step is about.",
 ].join("\n");
 
-function workerPrompt(input: {
+// The rules for everything but the graph, straight from the schema the submission is checked against.
+const { $schema: _, ...baseSchema } = z.toJSONSchema(analysisBaseSchema, { io: "input" });
+const BASE_FIELDS_GUIDE = JSON.stringify(baseSchema);
+
+export function workerPrompt(input: {
   pr: PrDetails;
   diffPath: string;
   ticketUrl: string | null;
@@ -115,6 +119,7 @@ function workerPrompt(input: {
     "2. summary: 2-4 sentences on what the PR does and why.",
     "3. lookClosely: up to 6 spots that deserve careful review (concurrency, migrations, auth, removed error handling, behaviour changes), each with groupIds.",
     "4. ticket: the ticket url/title and parent project title you read, or nulls.",
+    `Fields 1-4 follow this JSON Schema exactly (field names and allowed values): ${BASE_FIELDS_GUIDE}`,
     `5. graph: a PR Lens graph document (@coldtea/pr-lens-schema, schemaVersion "0.3.0") with the diagrams and the walkthrough. ${GRAPH_GUIDE}`,
     "",
     `When done, call the ${ANALYSIS_TOOL} tool exactly once with the full result. If it reports problems, fix them and call it again. After it reports success, end your turn with a one-line confirmation and nothing else.`,
