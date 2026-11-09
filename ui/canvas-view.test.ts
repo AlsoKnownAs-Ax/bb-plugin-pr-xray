@@ -21,6 +21,8 @@ describe("fitting a diagram", () => {
 
   it("keeps clear of panels on both sides", () => {
     expect(fitView(size(1200, 600), render, null, 344, 344)).toEqual({ scale: 1.2, x: 360, y: 176 });
+    // 966 - 688 leaves under 320px between them, so both overlap instead.
+    expect(fitView(size(966, 600), render, null, 344, 344)).toEqual({ scale: 1.2, x: 243, y: 176 });
   });
 
   it("shrinks to fit the narrower side, but no smaller than 10%", () => {

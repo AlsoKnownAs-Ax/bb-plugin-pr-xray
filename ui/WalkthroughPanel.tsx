@@ -1,5 +1,5 @@
-// The PR Lens walkthrough over the diagram canvas: a numbered list of steps
-// (or a one-line caption bar), stepped with the arrow keys, that collapses to a pill.
+// The PR Lens walkthrough, floating over the left of the diagram canvas: a
+// numbered list of steps, stepped with the arrow keys, that collapses to a pill.
 import { useEffect } from "react";
 import { detailParts, type CiteRef, type WalkthroughStep } from "@coldtea/pr-lens-schema";
 import { Button } from "@/components/ui/button";
@@ -49,16 +49,16 @@ export function WalkthroughPanel({
   onSelect,
   citeAction,
   onCollapse,
-  className,
 }: StepProps & {
   /** What clicking a cite does, or null to show it as plain text. */
   citeAction: (ref: CiteRef) => (() => void) | null;
   onCollapse: () => void;
-  /** Where it floats over the canvas. */
-  className: string;
 }) {
   return (
-    <aside aria-label="Walkthrough" className={cn("absolute flex w-80 flex-col rounded-lg border border-border bg-background/95 shadow-md", className)}>
+    <aside
+      aria-label="Walkthrough"
+      className="absolute left-3 top-3 flex max-h-[calc(100%-1.5rem)] w-80 flex-col rounded-lg border border-border bg-background/95 shadow-md motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-left-2"
+    >
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <span className="text-sm font-medium">Walkthrough</span>
         <span className="text-xs text-muted-foreground">{progressLabel(current, steps.length)}</span>
@@ -105,48 +105,6 @@ export function WalkthroughPanel({
   );
 }
 
-/** The walkthrough as one line under the drawing: the step's heading and body, with numbered steps to jump to. */
-export function WalkthroughCaption({ steps, current, onSelect, onCollapse }: StepProps & { onCollapse: () => void }) {
-  const step = stepAt(steps, current);
-  const go = (key: string) => onSelect(stepForKey(key, current, steps.length) ?? null);
-  return (
-    <div aria-label="Walkthrough" className="flex shrink-0 items-center gap-2 border-t border-border px-3 py-2">
-      <Button size="icon" variant="ghost" className="size-7" onClick={() => go("ArrowLeft")} aria-label="Previous step">
-        <Icon name="ChevronLeft" />
-      </Button>
-      <Button size="icon" variant="ghost" className="size-7" onClick={() => go("ArrowRight")} aria-label="Next step">
-        <Icon name="ChevronRight" />
-      </Button>
-      <div className="min-w-0 flex-1">
-        {step ? (
-          <>
-            <div className="truncate text-sm font-medium">{step.heading}</div>
-            <div className="truncate text-xs text-muted-foreground">{step.body}</div>
-          </>
-        ) : (
-          <>
-            <div className="text-sm font-medium">Walkthrough</div>
-            <div className="truncate text-xs text-muted-foreground">{steps.length} steps through the change. Use ← → or pick a step.</div>
-          </>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-1">
-        {steps.map((candidate, index) => (
-          <button key={candidate.id} type="button" aria-label={`Step ${index + 1}: ${candidate.heading}`} aria-current={index === current ? "step" : undefined} onClick={() => onSelect(index)}>
-            <StepNumber index={index} current={current} />
-          </button>
-        ))}
-        <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" aria-pressed={current === null} onClick={() => onSelect(null)}>
-          All
-        </Button>
-        <Button size="icon" variant="ghost" className="size-7" onClick={onCollapse} aria-label="Collapse walkthrough">
-          <Icon name="ChevronDown" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 /** The collapsed walkthrough: where you are, and a click to open it again. */
 export function WalkthroughPill({ current, count, onExpand }: { current: number | null; count: number; onExpand: () => void }) {
   return (
@@ -162,14 +120,6 @@ export function WalkthroughPill({ current, count, onExpand }: { current: number 
       <Icon name="ChevronRight" className="size-3.5" />
     </button>
   );
-}
-
-function stepAt(steps: WalkthroughStep[], current: number | null): WalkthroughStep | undefined {
-  if (current === null) {
-    return undefined;
-  }
-
-  return steps[current];
 }
 
 function StepNumber({ index, current }: { index: number; current: number | null }) {

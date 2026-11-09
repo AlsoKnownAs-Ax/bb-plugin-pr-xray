@@ -17,7 +17,6 @@ export function DiagramCanvas({
   reserveRight = 0,
   reserveLeft = 0,
   controlsRight = 12,
-  refitKey = "",
 }: {
   render: DiagramRender;
   /** Drawn over the SVG in its viewBox units; gets the zoom so pins can keep their screen size. */
@@ -31,14 +30,14 @@ export function DiagramCanvas({
   reserveLeft?: number;
   /** Distance of the zoom controls from the right edge, to clear a panel over it. */
   controlsRight?: number;
-  /** Fits again whenever this changes, e.g. when a panel beside the canvas resizes it. */
-  refitKey?: string;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgHostRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState({ x: 0, y: 0, scale: 1 });
   const drag = useRef<{ x: number; y: number; vx: number; vy: number; moved: boolean } | null>(null);
   const prefersReducedMotion = usePrefersReducedMotion();
+  // Set once the reader pans or zooms, so a resize never moves a view they chose.
+  const moved = useRef(false);
 
   const fit = () => {
     const box = containerRef.current?.getBoundingClientRect();
@@ -46,11 +45,30 @@ export function DiagramCanvas({
       return;
     }
 
+    moved.current = false;
     setView(fitView(box, render, unionBox(focus), reserveRight, reserveLeft));
   };
   const focusKey = JSON.stringify(focus);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useLayoutEffect(fit, [render.width, render.height, focusKey, reserveRight, reserveLeft, refitKey]);
+  useLayoutEffect(fit, [render.width, render.height, focusKey, reserveRight, reserveLeft]);
+
+  // Fit again when the canvas resizes (focus mode, the window), unless the reader has moved the view.
+  const fitRef = useRef(fit);
+  fitRef.current = fit;
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (!moved.current) {
+        fitRef.current();
+      }
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   // Re-run on every SVG swap: a new SVG starts its animations again.
   useEffect(() => {
@@ -80,6 +98,7 @@ export function DiagramCanvas({
       event.preventDefault();
       const box = container.getBoundingClientRect();
       const factor = Math.exp(-event.deltaY * wheelZoomRate(event));
+      moved.current = true;
       setView((current) => zoomAt(current, factor, event.clientX - box.left, event.clientY - box.top));
     };
     container.addEventListener("wheel", onWheel, { passive: false });
@@ -93,7 +112,10 @@ export function DiagramCanvas({
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
     const state = drag.current;
     if (!state) return;
-    if (Math.abs(event.clientX - state.x) + Math.abs(event.clientY - state.y) > 3) state.moved = true;
+    if (Math.abs(event.clientX - state.x) + Math.abs(event.clientY - state.y) > 3) {
+      state.moved = true;
+      moved.current = true;
+    }
     setView((current) => ({ ...current, x: state.vx + event.clientX - state.x, y: state.vy + event.clientY - state.y }));
   };
   const onPointerUp = () => {
@@ -101,7 +123,10 @@ export function DiagramCanvas({
     drag.current = null;
   };
 
-  const zoom = (factor: number) => setView((current) => zoomBy(current, factor));
+  const zoom = (factor: number) => {
+    moved.current = true;
+    setView((current) => zoomBy(current, factor));
+  };
 
   return (
     <div
