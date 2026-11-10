@@ -100,19 +100,16 @@ export function useAgentConfirm(prRef: PrRef, pr: PrDetails | null) {
           <DialogTitle>{copy?.title}</DialogTitle>
           <DialogDescription>{copy?.description}</DialogDescription>
         </DialogHeader>
-        <div className="space-y-1">
-          <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+          <label className="flex cursor-pointer items-center gap-2">
             <Checkbox
               checked={dontAskAgain}
               onCheckedChange={(checked) => setDontAskAgain(checked === true)}
               aria-describedby="dont-ask-again-hint"
             />
-            Don't ask again for any PR
+            Don't ask again for any PR.
           </label>
-          {/* pl-6 lines the hint up under the label text: checkbox (1rem) + gap (0.5rem). */}
-          <p id="dont-ask-again-hint" className="pl-6 text-xs text-muted-foreground">
-            You can turn this back on in Settings.
-          </p>
+          <span id="dont-ask-again-hint">You can turn this back on in Settings.</span>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => answer(false)}>
