@@ -40,6 +40,10 @@ _Avoid_: Diagram comment, node comment
 The review filling the whole window, with bb's surroundings hidden.
 _Avoid_: Full screen, zen mode
 
+**Trust prompt**:
+A question asking the reviewer to confirm before an agent reads text someone else wrote, such as another person's PR or comments. The reviewer can turn trust prompts off for every PR.
+_Avoid_: Trusted mode, trust dialog, malicious-code warning
+
 **Spotlight**:
 The part of a diagram a walkthrough step (or a cite in it) zooms to, with the rest dimmed.
 _Avoid_: Focus, highlight

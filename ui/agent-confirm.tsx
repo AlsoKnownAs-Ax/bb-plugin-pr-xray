@@ -1,10 +1,12 @@
 // The dialogs that ask before an agent reads text the user didn't write.
+import { useRpc } from "@get-bb/plugin-sdk/app";
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import type { rpcContract } from "../shared/contract";
 import { prRefKey } from "../shared/pr-ref";
 import type { PrDetails, PrRef } from "../shared/schema";
-import { needsAgentWarning, type AgentJob } from "./agent-trust";
+import { askUnlessSkipped, needsAgentWarning, type AgentJob } from "./agent-trust";
 
 interface AgentConfirm {
   /** Asks once per PR, and only when other people's text is involved. */
@@ -37,31 +39,39 @@ const COPY = {
 };
 
 export function useAgentConfirm(prRef: PrRef, pr: PrDetails | null) {
+  const rpc = useRpc<typeof rpcContract>();
   const warningKey = `pr-xray:agent-warning:${prRefKey(prRef)}`;
   const [question, setQuestion] = useState<{ kind: keyof typeof COPY; answer: (accepted: boolean) => void } | null>(null);
   // A ref, so these callbacks stay the same while the review data refreshes.
   const latestPr = useRef(pr);
   latestPr.current = pr;
+  // Read on every ask, so turning the setting on or off applies to open review pages.
+  const skipTrustPrompts = useCallback(async () => (await rpc.call("settings.getSkipTrustPrompts")).skipTrustPrompts, [rpc]);
 
   const confirmAgent = useCallback(
     (job: AgentJob) => {
       const current = latestPr.current;
       if (current === null || !needsAgentWarning(current, job) || localStorage.getItem(warningKey)) return Promise.resolve(true);
-      return new Promise<boolean>((resolve) =>
-        setQuestion({
-          kind: "agent",
-          answer: (accepted) => {
-            if (accepted) localStorage.setItem(warningKey, "accepted");
-            resolve(accepted);
-          },
-        }),
+      return askUnlessSkipped(
+        skipTrustPrompts,
+        () =>
+          new Promise<boolean>((resolve) =>
+            setQuestion({
+              kind: "agent",
+              answer: (accepted) => {
+                if (accepted) localStorage.setItem(warningKey, "accepted");
+                resolve(accepted);
+              },
+            }),
+          ),
       );
     },
-    [warningKey],
+    [warningKey, skipTrustPrompts],
   );
   const confirmOthersComments = useCallback(
-    () => new Promise<boolean>((resolve) => setQuestion({ kind: "others", answer: resolve })),
-    [],
+    () =>
+      askUnlessSkipped(skipTrustPrompts, () => new Promise<boolean>((resolve) => setQuestion({ kind: "others", answer: resolve }))),
+    [skipTrustPrompts],
   );
 
   const answer = (accepted: boolean) => {

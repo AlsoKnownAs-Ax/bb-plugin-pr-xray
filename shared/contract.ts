@@ -184,7 +184,16 @@ export const rpcContract = defineRpcContract({
       identityError: z.string().nullable(),
       models: z.object({ analysis: modelSelectionSchema.nullable(), tagging: modelSelectionSchema.nullable() }),
       pickerSeed: modelSelectionSchema.nullable(),
+      skipTrustPrompts: z.boolean(),
     }),
+  },
+  "settings.getSkipTrustPrompts": {
+    input: z.null(),
+    output: z.object({ skipTrustPrompts: z.boolean() }),
+  },
+  "settings.setSkipTrustPrompts": {
+    input: z.object({ skip: z.boolean() }),
+    output: ok,
   },
   "settings.setModel": {
     input: z.object({ purpose: modelPurposeSchema, selection: modelSelectionSchema.nullable() }),
