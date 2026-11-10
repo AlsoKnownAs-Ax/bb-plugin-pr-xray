@@ -15,5 +15,6 @@ export function needsAgentWarning(pr: PrDetails, job: AgentJob): boolean {
 
 /** Skips the trust prompt when the user turned them off in Settings; asks if that can't be read. */
 export async function askUnlessSkipped(skipTrustPrompts: () => Promise<boolean>, ask: () => Promise<boolean>): Promise<boolean> {
-  return (await skipTrustPrompts().catch(() => false)) || ask();
+  const skip = await skipTrustPrompts().catch(() => false);
+  return skip || ask();
 }

@@ -48,7 +48,10 @@ export default async function plugin(bb: BbPluginApi) {
   const store = createStore(bb);
   const github = createGithub(async () => (await settings.get()).githubToken as string | undefined);
   const models = createModels(bb);
-  const skipTrustPrompts = async () => (await bb.storage.kv.get(SKIP_TRUST_PROMPTS_KEY)) === true;
+  const skipTrustPrompts = async () => {
+    const stored = await bb.storage.kv.get(SKIP_TRUST_PROMPTS_KEY);
+    return stored === true;
+  };
   const comments = createComments({ bb, store, github, models, loadPr });
   const analysis = createAnalysis({
     bb,
@@ -306,7 +309,8 @@ export default async function plugin(bb: BbPluginApi) {
       return { identity, identityError, models: { analysis: analysisModel, tagging: taggingModel }, pickerSeed, skipTrustPrompts: skipTrust };
     },
     async "settings.getSkipTrustPrompts"() {
-      return { skipTrustPrompts: await skipTrustPrompts() };
+      const skip = await skipTrustPrompts();
+      return { skipTrustPrompts: skip };
     },
     async "settings.setSkipTrustPrompts"({ skip }) {
       if (skip) await bb.storage.kv.set(SKIP_TRUST_PROMPTS_KEY, true);

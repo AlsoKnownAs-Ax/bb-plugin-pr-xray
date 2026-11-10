@@ -46,7 +46,10 @@ export function useAgentConfirm(prRef: PrRef, pr: PrDetails | null) {
   const latestPr = useRef(pr);
   latestPr.current = pr;
   // Read on every ask, so turning the setting on or off applies to open review pages.
-  const skipTrustPrompts = useCallback(async () => (await rpc.call("settings.getSkipTrustPrompts")).skipTrustPrompts, [rpc]);
+  const skipTrustPrompts = useCallback(async () => {
+    const result = await rpc.call("settings.getSkipTrustPrompts");
+    return result.skipTrustPrompts;
+  }, [rpc]);
 
   const confirmAgent = useCallback(
     (job: AgentJob) => {
