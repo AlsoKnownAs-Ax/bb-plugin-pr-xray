@@ -1,12 +1,15 @@
 // The dialogs that ask before an agent reads text the user didn't write.
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { rpcContract } from "../shared/contract";
 import { prRefKey } from "../shared/pr-ref";
 import type { PrDetails, PrRef } from "../shared/schema";
-import { askUnlessSkipped, needsAgentWarning, type AgentJob } from "./agent-trust";
+import { askUnlessSkipped, needsAgentWarning, rememberDontAskAgain, type AgentJob } from "./agent-trust";
+import { errorMessage } from "./useReview";
 
 interface AgentConfirm {
   /** Asks once per PR, and only when other people's text is involved. */
@@ -42,6 +45,7 @@ export function useAgentConfirm(prRef: PrRef, pr: PrDetails | null) {
   const rpc = useRpc<typeof rpcContract>();
   const warningKey = `pr-xray:agent-warning:${prRefKey(prRef)}`;
   const [question, setQuestion] = useState<{ kind: keyof typeof COPY; answer: (accepted: boolean) => void } | null>(null);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
   // A ref, so these callbacks stay the same while the review data refreshes.
   const latestPr = useRef(pr);
   latestPr.current = pr;
@@ -78,17 +82,35 @@ export function useAgentConfirm(prRef: PrRef, pr: PrDetails | null) {
   );
 
   const answer = (accepted: boolean) => {
+    rememberDontAskAgain(
+      accepted,
+      dontAskAgain,
+      () => rpc.call("settings.setSkipTrustPrompts", { skip: true }),
+      (cause) => toast.error(errorMessage(cause)),
+    );
     question?.answer(accepted);
     setQuestion(null);
+    setDontAskAgain(false);
   };
   const copy = question ? COPY[question.kind] : null;
   const dialog = (
     <Dialog open={question !== null} onOpenChange={(open) => !open && answer(false)}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
+        <DialogHeader className="space-y-2.5">
           <DialogTitle>{copy?.title}</DialogTitle>
           <DialogDescription>{copy?.description}</DialogDescription>
         </DialogHeader>
+        <div className="flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
+          <label className="flex cursor-pointer items-center gap-2">
+            <Checkbox
+              checked={dontAskAgain}
+              onCheckedChange={(checked) => setDontAskAgain(checked === true)}
+              aria-describedby="dont-ask-again-hint"
+            />
+            Don't ask again for any PR.
+          </label>
+          <span id="dont-ask-again-hint">You can turn this back on in Settings.</span>
+        </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => answer(false)}>
             Cancel

@@ -18,3 +18,8 @@ export async function askUnlessSkipped(skipTrustPrompts: () => Promise<boolean>,
   const skip = await skipTrustPrompts().catch(() => false);
   return skip || ask();
 }
+
+/** Turns Skip trust prompts on only for a ticked "Don't ask again" plus Continue. A failed save is reported, never blocks the run. */
+export function rememberDontAskAgain(accepted: boolean, ticked: boolean, save: () => Promise<unknown>, onError: (cause: unknown) => void): void {
+  if (accepted && ticked) save().catch(onError);
+}

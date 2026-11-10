@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrDetails } from "../shared/schema";
-import { askUnlessSkipped, needsAgentWarning } from "./agent-trust";
+import { askUnlessSkipped, needsAgentWarning, rememberDontAskAgain } from "./agent-trust";
 
 const comment = (author: string) => ({ author });
 const pr = (isOwnPr: boolean, ...authors: string[]) =>
@@ -41,5 +41,34 @@ describe("skip trust prompts setting", () => {
 
   it("asks when the setting can't be read", async () => {
     await expect(askUnlessSkipped(() => Promise.reject(new Error("offline")), ask)).resolves.toBe(false);
+  });
+});
+
+describe("don't ask again for any PR", () => {
+  const run = (accepted: boolean, ticked: boolean, save: () => Promise<unknown>) => {
+    const errors: unknown[] = [];
+    const saves = { count: 0 };
+    rememberDontAskAgain(accepted, ticked, () => (saves.count++, save()), (cause) => errors.push(cause));
+    return { saves, errors };
+  };
+
+  it("turns the setting on when ticked and Continue is pressed", () => {
+    expect(run(true, true, () => Promise.resolve()).saves.count).toBe(1);
+  });
+
+  it("saves nothing on Cancel or close, even when ticked", () => {
+    expect(run(false, true, () => Promise.resolve()).saves.count).toBe(0);
+  });
+
+  it("saves nothing when the box isn't ticked", () => {
+    expect(run(true, false, () => Promise.resolve()).saves.count).toBe(0);
+  });
+
+  it("reports a failed save", async () => {
+    const failure = new Error("offline");
+    const { errors } = run(true, true, () => Promise.reject(failure));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(errors).toEqual([failure]);
   });
 });
