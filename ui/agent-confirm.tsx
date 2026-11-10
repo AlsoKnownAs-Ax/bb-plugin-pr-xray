@@ -101,7 +101,7 @@ export function useAgentConfirm(prRef: PrRef, pr: PrDetails | null) {
           <DialogDescription>{copy?.description}</DialogDescription>
         </DialogHeader>
         <div className="space-y-1">
-          <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">
+          <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
             <Checkbox
               checked={dontAskAgain}
               onCheckedChange={(checked) => setDontAskAgain(checked === true)}
