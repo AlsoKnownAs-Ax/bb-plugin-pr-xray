@@ -35,7 +35,7 @@ PR X-ray turns a pull request into something you can read and understand before 
 - Retro feed: comment tags (manual or AI) exported with `bb pr-xray comments --json`.
 - UI must look native inside bb: reuse bb's UI kit (`components/ui`) and theme, and support light and dark.
 - Comments and analysis text never load remote images or media. They render as links or plain text.
-- PR content is untrusted. Agent actions on other people's PRs or comments need explicit confirmation in the UI.
+- PR content is untrusted. Agent actions on other people's PRs or comments need explicit confirmation in the UI, unless the reviewer turns on Skip trust prompts in Settings.
 
 ## Brand Commitments
 

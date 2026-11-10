@@ -12,3 +12,9 @@ export function needsAgentWarning(pr: PrDetails, job: AgentJob): boolean {
   // Analysis and fixes read the PR's own content. Chat also reads its review threads.
   return job === "chat" && pr.threads.some((thread) => thread.comments.some((comment) => !isViewer(comment.author, pr.viewer)));
 }
+
+/** Skips the trust prompt when the user turned them off in Settings; asks if that can't be read. */
+export async function askUnlessSkipped(skipTrustPrompts: () => Promise<boolean>, ask: () => Promise<boolean>): Promise<boolean> {
+  const skip = await skipTrustPrompts().catch(() => false);
+  return skip || ask();
+}

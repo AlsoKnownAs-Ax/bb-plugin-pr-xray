@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PrDetails } from "../shared/schema";
-import { needsAgentWarning } from "./agent-trust";
+import { askUnlessSkipped, needsAgentWarning } from "./agent-trust";
 
 const comment = (author: string) => ({ author });
 const pr = (isOwnPr: boolean, ...authors: string[]) =>
@@ -25,5 +25,21 @@ describe("warning before an agent reads other people's text", () => {
   it("warns chat on your own PR when others commented, because chat reads the threads", () => {
     expect(needsAgentWarning(pr(true, "ann", "mallory"), "chat")).toBe(true);
     expect(needsAgentWarning(pr(true, "ann", "mallory"), "analysis")).toBe(false);
+  });
+});
+
+describe("skip trust prompts setting", () => {
+  const ask = () => Promise.resolve(false);
+
+  it("doesn't ask when the setting is on", async () => {
+    await expect(askUnlessSkipped(() => Promise.resolve(true), ask)).resolves.toBe(true);
+  });
+
+  it("asks when the setting is off", async () => {
+    await expect(askUnlessSkipped(() => Promise.resolve(false), ask)).resolves.toBe(false);
+  });
+
+  it("asks when the setting can't be read", async () => {
+    await expect(askUnlessSkipped(() => Promise.reject(new Error("offline")), ask)).resolves.toBe(false);
   });
 });

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { experimental_ProviderModelPicker as ProviderModelPicker, useRpc } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import type { rpcContract } from "../shared/contract";
 import type { ModelPurpose, ModelSelection } from "../shared/schema";
@@ -14,6 +15,7 @@ interface State {
   identityError: string | null;
   models: Record<ModelPurpose, ModelSelection | null>;
   pickerSeed: ModelSelection | null;
+  skipTrustPrompts: boolean;
 }
 
 function ModelSetting(props: {
@@ -98,6 +100,16 @@ function SettingsForm() {
     }
   };
 
+  const setSkipTrustPrompts = async (skip: boolean) => {
+    setState((current) => (current ? { ...current, skipTrustPrompts: skip } : current));
+    try {
+      await rpc.call("settings.setSkipTrustPrompts", { skip });
+    } catch (cause) {
+      toast.error(errorMessage(cause));
+      load();
+    }
+  };
+
   if (error) return <p className="text-sm text-destructive">{error}</p>;
   if (!state) return <p className="text-sm text-muted-foreground">Loading…</p>;
 
@@ -130,6 +142,25 @@ function SettingsForm() {
         pickerSeed={state.pickerSeed}
         onChange={(selection) => void save("tagging", selection)}
       />
+
+      <div className="flex items-start gap-2">
+        <Checkbox
+          id="skip-trust-prompts"
+          className="mt-0.5"
+          checked={state.skipTrustPrompts}
+          onCheckedChange={(checked) => void setSkipTrustPrompts(checked === true)}
+          aria-describedby="skip-trust-prompts-description"
+        />
+        <div className="space-y-1">
+          <label htmlFor="skip-trust-prompts" className="text-sm font-medium">
+            Skip trust prompts
+          </label>
+          <p id="skip-trust-prompts-description" className="text-sm text-muted-foreground">
+            Agents will run on any PR without asking first, even when they read text other people wrote, which can try to
+            prompt-inject them. This includes “Fix all open comments” and “Include others’ comments”, which run an agent that can push to the branch.
+          </p>
+        </div>
+      </div>
     </>
   );
 }

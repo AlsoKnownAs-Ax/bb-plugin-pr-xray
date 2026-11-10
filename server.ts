@@ -20,6 +20,7 @@ import { createStore } from "./server/store";
 export type { rpcContract };
 
 const PR_CACHE_MS = 20_000;
+const SKIP_TRUST_PROMPTS_KEY = "skipTrustPrompts";
 
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
@@ -47,6 +48,10 @@ export default async function plugin(bb: BbPluginApi) {
   const store = createStore(bb);
   const github = createGithub(async () => (await settings.get()).githubToken as string | undefined);
   const models = createModels(bb);
+  const skipTrustPrompts = async () => {
+    const stored = await bb.storage.kv.get(SKIP_TRUST_PROMPTS_KEY);
+    return stored === true;
+  };
   const comments = createComments({ bb, store, github, models, loadPr });
   const analysis = createAnalysis({
     bb,
@@ -295,12 +300,22 @@ export default async function plugin(bb: BbPluginApi) {
       } catch (error) {
         identityError = error instanceof Error ? error.message : String(error);
       }
-      const [analysisModel, taggingModel, pickerSeed] = await Promise.all([
+      const [analysisModel, taggingModel, pickerSeed, skipTrust] = await Promise.all([
         models.selected("analysis"),
         models.selected("tagging"),
         models.pickerSeed().catch(() => null),
+        skipTrustPrompts(),
       ]);
-      return { identity, identityError, models: { analysis: analysisModel, tagging: taggingModel }, pickerSeed };
+      return { identity, identityError, models: { analysis: analysisModel, tagging: taggingModel }, pickerSeed, skipTrustPrompts: skipTrust };
+    },
+    async "settings.getSkipTrustPrompts"() {
+      const skip = await skipTrustPrompts();
+      return { skipTrustPrompts: skip };
+    },
+    async "settings.setSkipTrustPrompts"({ skip }) {
+      if (skip) await bb.storage.kv.set(SKIP_TRUST_PROMPTS_KEY, true);
+      else await bb.storage.kv.delete(SKIP_TRUST_PROMPTS_KEY);
+      return { ok: true };
     },
     async "settings.setModel"({ purpose, selection }) {
       await models.select(purpose, selection);
