@@ -96,7 +96,7 @@ export function useAgentConfirm(prRef: PrRef, pr: PrDetails | null) {
   const dialog = (
     <Dialog open={question !== null} onOpenChange={(open) => !open && answer(false)}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
+        <DialogHeader className="space-y-2.5">
           <DialogTitle>{copy?.title}</DialogTitle>
           <DialogDescription>{copy?.description}</DialogDescription>
         </DialogHeader>
