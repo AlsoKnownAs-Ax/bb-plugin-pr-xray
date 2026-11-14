@@ -33,7 +33,7 @@ export type ViewMode = "unified" | "split";
 /** What the sidebar lists: the reading path or the File tree. */
 type SidebarView = "path" | "files";
 
-interface DraftTarget {
+export interface DraftTarget {
   /** The commit on screen when the line was picked: the line number only holds there. */
   headSha: string;
   hunkId: string;
@@ -58,6 +58,28 @@ const fileKey = (groupId: string, path: string) => `file:${groupId}:${path}`;
 
 const toSide = (side: SelectedLineRange["side"]): "LEFT" | "RIGHT" => (side === "deletions" ? "LEFT" : "RIGHT");
 const toAnnotationSide = (side: "LEFT" | "RIGHT") => (side === "LEFT" ? "deletions" : "additions");
+
+/** Stored comments by their GitHub id, to show tags on GitHub threads. */
+export function byGithubId(comments: StoredComment[]): Map<number, StoredComment> {
+  const map = new Map<number, StoredComment>();
+  for (const comment of comments) if (comment.githubCommentId !== null) map.set(comment.githubCommentId, comment);
+  return map;
+}
+
+function draftToComment(target: DraftTarget, body: string): DraftComment {
+  const side = toSide(target.range.endSide ?? target.range.side);
+  const start = Math.min(target.range.start, target.range.end);
+  const end = Math.max(target.range.start, target.range.end);
+  return {
+    headSha: target.headSha,
+    path: target.path,
+    line: end,
+    side,
+    startLine: start === end ? null : start,
+    startSide: start === end ? null : toSide(target.range.side),
+    body,
+  };
+}
 
 export function DiffTab({
   data,
@@ -93,11 +115,7 @@ export function DiffTab({
   const navigate = useBbNavigate();
   const hunks = useMemo(() => new Map(pr.hunks.map((hunk) => [hunk.id, hunk])), [pr.hunks]);
   const files = useMemo(() => new Map(pr.files.map((file) => [file.index, file])), [pr.files]);
-  const storedByGithubId = useMemo(() => {
-    const map = new Map<number, StoredComment>();
-    for (const comment of data.comments) if (comment.githubCommentId !== null) map.set(comment.githubCommentId, comment);
-    return map;
-  }, [data.comments]);
+  const storedByGithubId = useMemo(() => byGithubId(data.comments), [data.comments]);
   const [draft, setDraft] = useState<DraftTarget | null>(null);
   const [submitOpen, setSubmitOpen] = useState(false);
   const { confirmAgent, confirmOthersComments } = useAgentConfirmContext();
@@ -360,21 +378,6 @@ export function DiffTab({
   const hunksOfPath = (path: string) => pr.files.find((file) => file.path === path)?.hunkIds.flatMap((id) => hunks.get(id) ?? []) ?? [];
   const looseDrafts = data.pending.filter((comment) => !draftInDiff(comment, pr.headSha, hunksOfPath(comment.path)));
 
-  const draftToComment = (target: DraftTarget, body: string): DraftComment => {
-    const side = toSide(target.range.endSide ?? target.range.side);
-    const start = Math.min(target.range.start, target.range.end);
-    const end = Math.max(target.range.start, target.range.end);
-    return {
-      headSha: target.headSha,
-      path: target.path,
-      line: end,
-      side,
-      startLine: start === end ? null : start,
-      startSide: start === end ? null : toSide(target.range.side),
-      body,
-    };
-  };
-
   const openFullFile = async (file: PrFile) => {
     setFullFile({ file, content: null, loading: true });
     try {
@@ -565,7 +568,6 @@ export function DiffTab({
                   activeHunk={activeHunk}
                   setActiveHunk={setActiveHunk}
                   storedByGithubId={storedByGithubId}
-                  draftToComment={draftToComment}
                   openFullFile={(file) => void openFullFile(file)}
                 />
               ) : null}
@@ -656,7 +658,6 @@ function GroupHunks({
   activeHunk,
   setActiveHunk,
   storedByGithubId,
-  draftToComment,
   openFullFile,
   isFileViewed,
   isFileUpdated,
@@ -682,7 +683,6 @@ function GroupHunks({
   activeHunk: string | null;
   setActiveHunk: (id: string) => void;
   storedByGithubId: Map<number, StoredComment>;
-  draftToComment: (target: DraftTarget, body: string) => DraftComment;
   openFullFile: (file: PrFile) => void;
 }) {
   // Hunks of this group, kept together per file in diff order.
@@ -779,7 +779,6 @@ function GroupHunks({
                   active={activeHunk === hunk.id}
                   onActivate={() => setActiveHunk(hunk.id)}
                   storedByGithubId={storedByGithubId}
-                  draftToComment={draftToComment}
                   onAskChat={onAskChat}
                 />
               ))}
@@ -878,7 +877,7 @@ function useHunkFileDiff(rpc: Rpc, pr: ReviewGet["pr"], file: PrFile, hunk: Hunk
   }, [file, hunk, pr.hunks, text]);
 }
 
-function HunkDiff({
+export function HunkDiff({
   hunk,
   file,
   data,
@@ -889,7 +888,6 @@ function HunkDiff({
   active,
   onActivate,
   storedByGithubId,
-  draftToComment,
   onAskChat,
 }: {
   onAskChat: (question: string) => Promise<void>;
@@ -903,7 +901,6 @@ function HunkDiff({
   active: boolean;
   onActivate: () => void;
   storedByGithubId: Map<number, StoredComment>;
-  draftToComment: (target: DraftTarget, body: string) => DraftComment;
 }) {
   const { pr } = data;
   const codeTheme = useCodeTheme();
@@ -1021,7 +1018,7 @@ function HunkDiff({
         })}
       </div>
     ),
-    [data.pending.length, draftToComment, hunk, onAskChat, pr.ref, pr.viewer, rpc, setDraft, storedByGithubId],
+    [data.pending.length, hunk, onAskChat, pr.ref, pr.viewer, rpc, setDraft, storedByGithubId],
   );
 
   return (
