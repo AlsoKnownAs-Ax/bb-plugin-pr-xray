@@ -215,20 +215,36 @@ export function DiffTab({
   useEffect(() => localStorage.setItem("pr-xray:sidebar", sidebar), [sidebar]);
   const toggleSidebar = useCallback(() => setSidebar((current) => (current === "path" ? "files" : "path")), []);
 
+  /** Expands `path` in `group` even if viewed, then scrolls to `targetId` and flashes it. */
+  const reveal = (group: ReviewGroup, path: string, targetId: string) => {
+    setOpen(group.id, true);
+    setOpen(fileKey(group.id, path), true);
+    // Wait a frame so a just-expanded group has laid out before scrolling.
+    requestAnimationFrame(() => {
+      scrollTo(targetId);
+      flash(targetId);
+    });
+  };
+
   /** Jumps to the file in reading-path group `groupNumber` (default: its first appearance), opening it if viewed. */
   const openFile = (path: string, groupNumber?: number) => {
     const group = groupNumber ? groups[groupNumber - 1] : groups.find((candidate) => groupPaths.get(candidate.id)?.includes(path));
     if (!group) return false;
-    setOpen(group.id, true);
-    setOpen(fileKey(group.id, path), true);
-    // Wait a frame so a just-expanded group has laid out before scrolling.
-    requestAnimationFrame(() => scrollTo(`file-${fileKey(group.id, path)}`));
+    reveal(group, path, `file-${fileKey(group.id, path)}`);
     return true;
   };
 
   useEffect(() => {
-    if (scrollRequest) scrollTo(`group-${scrollRequest.groupId}`);
-  }, [scrollRequest, scrollTo]);
+    if (!scrollRequest) return;
+    const group = groups.find((candidate) => candidate.id === scrollRequest.groupId);
+    const hunk = hunks.get(group?.hunkIds[0] ?? "");
+    const path = hunk ? files.get(hunk.fileIndex)?.path : undefined;
+    if (!group) return;
+    if (hunk && path !== undefined) reveal(group, path, `hunk-${hunk.id}`);
+    else scrollTo(`group-${group.id}`);
+    // Only a new request reveals a group; reveal changes on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollRequest]);
 
   useEffect(() => {
     if (!fileRequest) {
@@ -617,6 +633,17 @@ export function DiffTab({
   );
 }
 
+/** Tints a (positioned) element for 1s, then fades the tint out. An overlay, so the diff's own background can't hide it. */
+function flash(id: string) {
+  const element = document.getElementById(id);
+  if (!element) return;
+  const overlay = document.createElement("div");
+  overlay.className = "pointer-events-none absolute inset-0 z-10 bg-warning/10 ring-1 ring-inset ring-warning/60";
+  element.append(overlay);
+  const animation = overlay.animate([{ opacity: 1 }, { opacity: 1, offset: 0.4 }, { opacity: 0 }], { duration: 2500, easing: "ease-out" });
+  animation.onfinish = () => overlay.remove();
+}
+
 function GroupHunks({
   group,
   hunks,
@@ -675,7 +702,7 @@ function GroupHunks({
           data.pr.threads.filter((thread) => !thread.isResolved && threadVisibleIn(thread, file.path, fileHunks)).length +
           data.pending.filter((comment) => comment.path === file.path && draftInDiff(comment, data.pr.headSha, fileHunks)).length;
         return (
-          <div key={fileIndex} id={`file-${fileKey(group.id, file.path)}`} data-file-path={file.path} className="scroll-mt-0 rounded-lg border border-border">
+          <div key={fileIndex} id={`file-${fileKey(group.id, file.path)}`} data-file-path={file.path} className="relative scroll-mt-0 rounded-lg border border-border">
             {/* Sticky so Viewed stays reachable while scrolling a long file. */}
             <div className={cn("sticky top-0 z-10 rounded-t-lg bg-background", !open && "rounded-b-lg")}>
               <div
@@ -1001,7 +1028,7 @@ function HunkDiff({
     <div
       id={`hunk-${hunk.id}`}
       onPointerDown={onActivate}
-      className={cn("scroll-mt-12 border-b border-dashed border-border last:border-b-0", active && "ring-1 ring-inset ring-ring")}
+      className={cn("relative scroll-mt-12 border-b border-dashed border-border last:border-b-0", active && "ring-1 ring-inset ring-ring")}
       style={{ "--diffs-font-size": "12px", "--diffs-line-height": "18px", ...SOFT_CHANGE_BG } as React.CSSProperties}
     >
       <FileDiff<AnnotationItem[]>
