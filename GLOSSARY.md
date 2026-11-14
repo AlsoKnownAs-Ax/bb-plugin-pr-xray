@@ -21,7 +21,7 @@ The PR's changed files arranged by directory, showing where the change lands in 
 _Avoid_: File list, file explorer, files panel
 
 **Diagram**:
-A picture of the PR's change, seen through one lens, that the reviewer can pin design comments to.
+A picture of the PR's change, seen through one lens.
 _Avoid_: Chart, graph, canvas
 
 **Lens**:
@@ -43,6 +43,10 @@ _Avoid_: Full screen, zen mode
 **Trust prompt**:
 A question asking the reviewer to confirm before an agent reads text someone else wrote, such as another person's PR or comments. The reviewer can turn trust prompts off for every PR.
 _Avoid_: Trusted mode, trust dialog, malicious-code warning
+
+**Code panel**:
+The code behind what the reviewer is looking at in the explanation (the current walkthrough step or the selected part of a diagram), where they can comment on it or ask about it.
+_Avoid_: Right tab, drawer, side panel
 
 **Spotlight**:
 The part of a diagram a walkthrough step (or a cite in it) zooms to, with the rest dimmed.
