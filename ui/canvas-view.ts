@@ -64,3 +64,15 @@ export function zoomAt(view: CanvasView, factor: number, px: number, py: number)
 export function zoomBy(view: CanvasView, factor: number): CanvasView {
   return { ...view, scale: clampScale(view.scale * factor) };
 }
+
+/** Each panel's width over the canvas, with its 12px margins. */
+const PANEL_RESERVE = { explain: 344, code: 504 };
+
+/** Whether the explanation panel shows, and what fitting keeps clear of. A compact viewport has room for one panel, over the drawing. */
+export function panelLayout(compact: boolean, explainOpen: boolean, codeOpen: boolean): { showExplain: boolean; reserve: Reserve } {
+  if (compact) {
+    return { showExplain: explainOpen && !codeOpen, reserve: NONE };
+  }
+
+  return { showExplain: explainOpen, reserve: { left: explainOpen ? PANEL_RESERVE.explain : 0, right: codeOpen ? PANEL_RESERVE.code : 0 } };
+}

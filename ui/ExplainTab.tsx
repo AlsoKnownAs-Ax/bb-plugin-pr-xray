@@ -8,9 +8,9 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { diagramTabs } from "../shared/diagram-tabs";
 import type { AnalysisRecord, ReviewGroup } from "../shared/schema";
-import type { Reserve } from "./canvas-view";
-import { hunksCode, partRefs, refsCode, stepRefs } from "./code-panel";
-import { CodePanel, type CodeSubject } from "./CodePanel";
+import { panelLayout } from "./canvas-view";
+import { codeSubject, hunksCode, refsCode, type CodeSubject } from "./code-panel";
+import { CodePanel } from "./CodePanel";
 import { DiagramCanvas } from "./DiagramCanvas";
 import { overlayTargets, type OverlayTarget } from "./diagram-overlay";
 import { SafeMarkdown } from "./SafeMarkdown";
@@ -24,10 +24,6 @@ const SEVERITY_STYLE = {
   medium: "border-warning/60 text-warning-text",
   low: "border-border text-muted-foreground",
 } as const;
-
-/** Each panel's width over the canvas, with its 12px margins, so fitting can keep clear of it. */
-const PANEL_RESERVE = { explain: 344, code: 504 };
-const NO_RESERVE: Reserve = { left: 0, right: 0 };
 
 type Result = NonNullable<AnalysisRecord["result"]>;
 
@@ -105,10 +101,7 @@ function DiagramExplain({
     setCodeOpen(open);
     if (open && compact) setExplainOpen(false);
   };
-  const showExplain = explainOpen && !(compact && codeOpen);
-  const reserve = compact
-    ? NO_RESERVE
-    : { left: widthIf(showExplain, PANEL_RESERVE.explain), right: widthIf(codeOpen, PANEL_RESERVE.code) };
+  const { showExplain, reserve } = panelLayout(compact, explainOpen, codeOpen);
   const focused = render ? focusBoxes(focus, render.atlas, tab.flow) : [];
 
   const show = (target: Target) => {
@@ -161,26 +154,7 @@ function DiagramExplain({
 
   useStepKeys({ steps, current: step, onSelect: selectStep });
   const hasSteps = steps.length > 0;
-  const subject = codeSubject();
-
-  /** The code behind what's picked: a part, else a pinned file or group, else the step. */
-  function codeSubject(): CodeSubject {
-    if (selected) {
-      return { title: selected.label, detail: `${selected.kind} · ${selected.delta}`, code: refsCode(data.pr, partRefs(graph, selected.id)) };
-    }
-
-    if (pinned) {
-      return pinned;
-    }
-
-    const current = step === null ? undefined : steps[step];
-    if (!current) {
-      return null;
-    }
-
-    const flow = tabs.find((candidate) => candidate.id === stepTarget(current).tab)?.flow ?? tab.flow;
-    return { title: current.heading, detail: `step ${step! + 1}`, code: refsCode(data.pr, stepRefs(graph, current, flow)) };
-  }
+  const subject = codeSubject({ doc: graph, pr: data.pr, tabs, tab, selected, pinned, step });
 
   return (
     <div className="relative h-full min-h-0 overflow-hidden">
@@ -311,14 +285,6 @@ function useStoredFlag(key: string, initial: boolean) {
   const [value, setValue] = useState(() => (localStorage.getItem(key) ?? String(initial)) === "true");
   useEffect(() => localStorage.setItem(key, String(value)), [key, value]);
   return [value, setValue] as const;
-}
-
-function widthIf(shown: boolean, width: number): number {
-  if (!shown) {
-    return 0;
-  }
-
-  return width;
 }
 
 function Summary({ result }: { result: Result }) {

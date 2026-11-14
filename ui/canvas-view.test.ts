@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitView, zoomAt, zoomBy } from "./canvas-view";
+import { fitView, panelLayout, zoomAt, zoomBy } from "./canvas-view";
 
 const size = (width: number, height: number) => ({ width, height });
 const render = size(400, 200);
@@ -42,5 +42,18 @@ describe("zooming", () => {
     expect(zoomAt({ x: 0, y: 0, scale: 1 }, 10, 100, 50)).toEqual({ scale: 4, x: -300, y: -150 });
     expect(zoomBy({ x: 5, y: 6, scale: 0.2 }, 0.1)).toEqual({ x: 5, y: 6, scale: 0.1 });
     expect(zoomBy({ x: 5, y: 6, scale: 1 }, 1.25)).toEqual({ x: 5, y: 6, scale: 1.25 });
+  });
+});
+
+describe("panels over the canvas", () => {
+  it("keeps clear of each open panel on a wide viewport", () => {
+    expect(panelLayout(false, true, true)).toEqual({ showExplain: true, reserve: { left: 344, right: 504 } });
+    expect(panelLayout(false, false, true)).toEqual({ showExplain: false, reserve: { left: 0, right: 504 } });
+    expect(panelLayout(false, true, false)).toEqual({ showExplain: true, reserve: { left: 344, right: 0 } });
+  });
+
+  it("shows one panel at a time on a compact viewport, over the drawing", () => {
+    expect(panelLayout(true, true, true)).toEqual({ showExplain: false, reserve: { left: 0, right: 0 } });
+    expect(panelLayout(true, true, false)).toEqual({ showExplain: true, reserve: { left: 0, right: 0 } });
   });
 });

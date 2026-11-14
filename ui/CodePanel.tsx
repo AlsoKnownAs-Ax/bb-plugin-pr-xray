@@ -3,12 +3,9 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import type { CodeFile } from "./code-panel";
+import type { CodeSubject } from "./code-panel";
 import { byGithubId, HunkDiff, type DraftTarget } from "./DiffTab";
 import type { ReviewGet, Rpc } from "./useReview";
-
-/** What the panel shows: a title and its code, or null when nothing is picked. */
-export type CodeSubject = { title: string; detail?: string; code: CodeFile[] } | null;
 
 export function CodePanel({
   data,

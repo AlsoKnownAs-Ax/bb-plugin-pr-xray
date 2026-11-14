@@ -1,13 +1,54 @@
 // What the Code panel shows: the PR's hunks behind a walkthrough step, a
 // diagram part, a cited file or a group, in PR order.
 import type { GraphDoc, GraphNode, WalkthroughStep } from "@coldtea/pr-lens-schema";
+import type { DiagramTab } from "../shared/diagram-tabs";
 import type { Hunk, PrDetails, PrFile } from "../shared/schema";
+import type { OverlayTarget } from "./diagram-overlay";
 import { hunkRange } from "./diff-utils";
+import { stepTarget } from "./walkthrough";
 
 /** A place in the code a diagram part names; no lines means the whole file. */
 export type FileRef = GraphNode["files"][number];
 export type CodeFile = { file: PrFile; hunks: Hunk[] };
 type Pr = Pick<PrDetails, "files" | "hunks">;
+/** What the panel shows: a title and its code, or null when nothing is picked. */
+export type CodeSubject = { title: string; detail?: string; code: CodeFile[] } | null;
+
+/** The code behind what's picked: a part, else a pinned file or group, else the step (`step` null = none). */
+export function codeSubject({
+  doc,
+  pr,
+  tabs,
+  tab,
+  selected,
+  pinned,
+  step,
+}: {
+  doc: GraphDoc;
+  pr: Pr;
+  tabs: DiagramTab[];
+  tab: DiagramTab;
+  selected: OverlayTarget | undefined;
+  pinned: CodeSubject;
+  step: number | null;
+}): CodeSubject {
+  if (selected) {
+    return { title: selected.label, detail: `${selected.kind} · ${selected.delta}`, code: refsCode(pr, partRefs(doc, selected.id)) };
+  }
+
+  if (pinned) {
+    return pinned;
+  }
+
+  const current = step === null ? undefined : doc.walkthrough?.steps[step];
+  if (!current) {
+    return null;
+  }
+
+  // A step's flow steps live in the flow its stage shows.
+  const flow = tabs.find((candidate) => candidate.id === stepTarget(current).tab)?.flow ?? tab.flow;
+  return { title: current.heading, detail: `step ${step! + 1}`, code: refsCode(pr, stepRefs(doc, current, flow)) };
+}
 
 /** The files of every part the step focuses, then its file cites. `flow` is the flow its stage shows. */
 export function stepRefs(doc: GraphDoc, step: WalkthroughStep, flow?: string): FileRef[] {

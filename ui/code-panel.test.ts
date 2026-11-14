@@ -1,7 +1,7 @@
 import type { GraphDoc, WalkthroughStep } from "@coldtea/pr-lens-schema";
 import { describe, expect, it } from "vitest";
 import type { Hunk, PrDetails, PrFile } from "../shared/schema";
-import { hunksCode, partRefs, refsCode, stepRefs } from "./code-panel";
+import { codeSubject, hunksCode, partRefs, refsCode, stepRefs } from "./code-panel";
 
 const hunk = (id: string, fileIndex: number, header: string) => ({ id, fileIndex, header }) as Hunk;
 const file = (index: number, path: string, hunkIds: string[], previousPath: string | null = null) =>
@@ -83,5 +83,29 @@ describe("the code of a group", () => {
       ["api.ts", ["a2"]],
       ["db.ts", ["d1"]],
     ]);
+  });
+});
+
+describe("what the Code panel shows", () => {
+  const tabs = [{ id: "overview", title: "Overview", lens: "architecture" as const }, { id: "lookup", title: "Lookup", lens: "data-flow" as const, flow: "lookup" }];
+  const steps = [step({ nodes: ["route"] }), { ...step({ messages: ["get"] }), heading: "Lookup", stage: { kind: "flow", flow: "lookup" } } as WalkthroughStep];
+  const walkDoc = { ...doc, walkthrough: { steps: steps.map((s, i) => ({ ...s, heading: s.heading ?? `Step ${i + 1}` })) } } as unknown as GraphDoc;
+  const base = { doc: walkDoc, pr, tabs, tab: tabs[0]!, selected: undefined, pinned: null, step: null };
+  const part = { id: "route", label: "Route", kind: "service", delta: "modified", box: { x: 0, y: 0, width: 1, height: 1 } };
+  const pinnedFile = { title: "db.ts", detail: "file", code: [] };
+
+  it("is nothing until a step, part, file or group is picked", () => {
+    expect(codeSubject(base)).toBeNull();
+  });
+
+  it("is the picked part first, then a pinned file or group, then the step", () => {
+    expect(codeSubject({ ...base, step: 0, pinned: pinnedFile, selected: part })).toMatchObject({ title: "Route", detail: "service · modified" });
+    expect(ids(codeSubject({ ...base, step: 0, selected: part })!.code)).toEqual([["api.ts", ["a1"]]]);
+    expect(codeSubject({ ...base, step: 0, pinned: pinnedFile })).toBe(pinnedFile);
+    expect(codeSubject({ ...base, step: 0 })).toMatchObject({ title: "Step 1", detail: "step 1" });
+  });
+
+  it("finds a step's flow steps in the flow it stages, whatever tab is showing", () => {
+    expect(ids(codeSubject({ ...base, step: 1 })!.code)).toEqual([["db.ts", ["d1"]]]);
   });
 });
