@@ -9,7 +9,7 @@ import {
   type PrDetails,
   type PrRef,
 } from "../shared/schema";
-import { commentTargets, diagramTab, diagramTabs } from "../shared/diagram-tabs";
+import { commentTargets, diagramTabs } from "../shared/diagram-tabs";
 import { prRefKey } from "../shared/pr-ref";
 import type { Github, RawReviewComment } from "./github";
 import type { Models } from "./models";
@@ -142,34 +142,6 @@ export function createComments(deps: {
     }
   }
 
-  /** A design comment on a node or table of one diagram tab of an analysis. */
-  function addDiagramComment(input: { ref: PrRef; analysisId: string; diagramId: string; nodeId: string; body: string }) {
-    const record = store.analysis(input.analysisId);
-    const graph = record?.result?.graph;
-    const tab = graph && diagramTab(graph, input.diagramId);
-    const nodeLabel = graph && tab && commentTargets(graph, tab).get(input.nodeId);
-    if (!record || !nodeLabel) {
-      throw new Error("That diagram node no longer exists.");
-    }
-
-    const comment = store.insertComment({
-      source: "diagram",
-      ref: input.ref,
-      headSha: record.headSha,
-      body: input.body,
-      githubCommentId: null,
-      githubUrl: null,
-      path: null,
-      line: null,
-      analysisId: input.analysisId,
-      diagramId: input.diagramId,
-      nodeId: input.nodeId,
-      nodeLabel,
-    });
-    publish(input.ref);
-    return comment;
-  }
-
   /** After a new analysis, pins whose node or table is no longer on their diagram tab become outdated. */
   function reconcileDiagramPins(analysisId: string) {
     const analysis = store.analysis(analysisId);
@@ -276,7 +248,6 @@ export function createComments(deps: {
     setThreadResolved,
     requireOwnPr,
     requireOwnDesignComment,
-    addDiagramComment,
     reconcileDiagramPins,
     setTag,
     autoTag,

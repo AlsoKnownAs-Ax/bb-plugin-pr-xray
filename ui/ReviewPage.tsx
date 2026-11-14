@@ -320,6 +320,7 @@ export function ReviewPage({ prRef }: { prRef: PrRef }) {
               setTab("diff");
               setFileRequest(path);
             }}
+            onAskChat={askChat}
             onReanalyse={() => void reanalyse()}
           />
         ) : running ? (
