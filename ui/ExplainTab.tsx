@@ -118,6 +118,8 @@ function DiagramExplain({
   };
   const selectStep = (index: number | null) => {
     setStep(index);
+    // A step replaces whatever part or file the Code panel was showing.
+    setSelectedId(null);
     setPinned(null);
     const chosen = index === null ? undefined : steps[index];
     if (chosen) show(stepTarget(chosen));
@@ -127,6 +129,11 @@ function DiagramExplain({
     setSelectedId(id);
     setPinned(null);
   };
+  /** Clicking a part shows its code, opening the Code panel. */
+  const pickPart = (id: string) => {
+    selectPart(id);
+    openCode(true);
+  };
   const pin = (subject: NonNullable<CodeSubject>) => {
     setSelectedId(null);
     setPinned(subject);
@@ -134,7 +141,7 @@ function DiagramExplain({
   };
   const citeAction = (ref: CiteRef) => {
     if (ref.kind === "file") return () => pin({ title: ref.path, detail: "file", code: refsCode(data.pr, [{ path: ref.path }]) });
-    // Node and table cites select the part; column cites stay plain text.
+    // Node and table cites pick the part, as clicking it does; column cites stay plain text.
     if (ref.kind === "node" || ref.kind === "table") {
       const id = partId(ref);
       const onTab = nodeTab(graph, tabs, tab.id, id);
@@ -149,7 +156,7 @@ function DiagramExplain({
           setFocus({ kind: "all" });
           setTabId(onTab);
         }
-        selectPart(id);
+        pickPart(id);
       };
     }
     const target = citeTarget(graph, tabs, ref);
@@ -168,10 +175,10 @@ function DiagramExplain({
           key={tab.id}
           render={render}
           onBackgroundClick={() => {
-            selectPart(null);
             selectStep(null);
+            openCode(false);
           }}
-          overlay={() => <DiagramOverlay targets={targets} selectedId={selectedId} onSelect={selectPart} />}
+          overlay={() => <DiagramOverlay targets={targets} selectedId={selectedId} onSelect={pickPart} />}
           focus={focused}
           reserve={reserve}
         />
