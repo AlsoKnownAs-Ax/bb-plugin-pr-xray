@@ -889,8 +889,11 @@ export function HunkDiff({
   onActivate,
   storedByGithubId,
   onAskChat,
+  wrap = true,
 }: {
   onAskChat: (question: string) => Promise<void>;
+  /** False scrolls long lines sideways instead of wrapping them, as an editor does. */
+  wrap?: boolean;
   hunk: Hunk;
   file: PrFile;
   data: ReviewGet;
@@ -939,7 +942,7 @@ export function HunkDiff({
   const options = useMemo(
     () => ({
       diffStyle: view,
-      overflow: "wrap" as const,
+      overflow: wrap ? ("wrap" as const) : ("scroll" as const),
       disableFileHeader: true,
       themeType: codeTheme.mode,
       theme: codeTheme.name as never,
@@ -957,7 +960,7 @@ export function HunkDiff({
         setDraft({ headSha: pr.headSha, hunkId: hunk.id, path: file.path, range: useSelection ? current : range });
       },
     }),
-    [codeTheme.mode, codeTheme.name, file.path, hunk.id, pr.headSha, setDraft, view],
+    [codeTheme.mode, codeTheme.name, file.path, hunk.id, pr.headSha, setDraft, view, wrap],
   );
 
   const renderAnnotation = useCallback(

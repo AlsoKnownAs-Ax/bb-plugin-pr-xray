@@ -1,6 +1,6 @@
 // The visual explanation: PR Lens diagrams on a full-bleed canvas, with the
 // explanation floating on the left and the Code panel on the right.
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { experimental_useCodeTheme as useCodeTheme } from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
 import { useIsCompactViewport } from "@/components/ui/hooks/use-compact-viewport";
@@ -8,7 +8,7 @@ import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/utils";
 import { diagramTabs } from "../shared/diagram-tabs";
 import type { AnalysisRecord, ReviewGroup } from "../shared/schema";
-import { panelLayout } from "./canvas-view";
+import { clampCodeWidth, defaultCodeWidth, panelLayout } from "./canvas-view";
 import { codeSubject, hunksCode, refsCode, type CodeSubject } from "./code-panel";
 import { CodePanel } from "./CodePanel";
 import { DiagramCanvas } from "./DiagramCanvas";
@@ -101,7 +101,12 @@ function DiagramExplain({
     setCodeOpen(open);
     if (open && compact) setExplainOpen(false);
   };
-  const { showExplain, reserve } = panelLayout(compact, explainOpen, codeOpen);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const canvasWidth = useWidth(rootRef);
+  // Null until the reviewer resizes it: then about half the canvas, whatever its size.
+  const [chosenWidth, setChosenWidth] = useStoredNumber("pr-xray:code-panel-width");
+  const codeWidth = clampCodeWidth(chosenWidth ?? defaultCodeWidth(canvasWidth), canvasWidth);
+  const { showExplain, reserve } = panelLayout(compact, explainOpen, codeOpen, codeWidth);
   const focused = render ? focusBoxes(focus, render.atlas, tab.flow) : [];
 
   const show = (target: Target) => {
@@ -157,7 +162,7 @@ function DiagramExplain({
   const subject = codeSubject({ doc: graph, pr: data.pr, tabs, tab, selected, pinned, step });
 
   return (
-    <div className="relative h-full min-h-0 overflow-hidden">
+    <div ref={rootRef} className="relative h-full min-h-0 overflow-hidden">
       {render ? (
         <DiagramCanvas
           key={tab.id}
@@ -232,7 +237,16 @@ function DiagramExplain({
       )}
 
       {codeOpen ? (
-        <FloatingPanel side="right" compact={compact} label="Code panel">
+        <FloatingPanel side="right" compact={compact} label="Code panel" width={codeWidth}>
+          {compact ? null : (
+            <ResizeHandle
+              width={codeWidth}
+              min={clampCodeWidth(0, canvasWidth)}
+              max={clampCodeWidth(Infinity, canvasWidth)}
+              onResize={(width) => setChosenWidth(clampCodeWidth(width, canvasWidth))}
+              onReset={() => setChosenWidth(null)}
+            />
+          )}
           <CodePanel data={data} rpc={rpc} subject={subject} onAskChat={onAskChat} onOpenFile={onOpenFile} onCollapse={() => openCode(false)} />
         </FloatingPanel>
       ) : (
@@ -245,20 +259,93 @@ function DiagramExplain({
   );
 }
 
-/** A panel floating over one edge of the canvas; across the whole width on a compact viewport. The right one stops above the chat button. */
-function FloatingPanel({ side, compact, label, children }: { side: "left" | "right"; compact: boolean; label: string; children: ReactNode }) {
+/**
+ * A panel floating over one edge of the canvas; across the whole width on a compact viewport.
+ * The left one is sized to its content; the right one (code) runs the canvas's full height, at `width`.
+ */
+function FloatingPanel({ side, compact, label, width, children }: { side: "left" | "right"; compact: boolean; label: string; width?: number; children: ReactNode }) {
   return (
     <aside
       aria-label={label}
       className={cn(
-        "absolute top-3 flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-md motion-safe:animate-in motion-safe:fade-in-0",
-        side === "left" ? "max-h-[calc(100%-1.5rem)] motion-safe:slide-in-from-left-2" : "max-h-[calc(100%-5.5rem)] motion-safe:slide-in-from-right-2",
-        compact ? "inset-x-3" : side === "left" ? "left-3 w-80" : "right-3 w-[30rem]",
+        "absolute top-3 flex flex-col rounded-lg border border-border bg-background shadow-md motion-safe:animate-in motion-safe:fade-in-0",
+        side === "left" ? "max-h-[calc(100%-1.5rem)] overflow-hidden motion-safe:slide-in-from-left-2" : "bottom-3 motion-safe:slide-in-from-right-2",
+        compact ? "inset-x-3" : side === "left" ? "left-3 w-80" : "right-3",
       )}
+      style={compact ? undefined : { width }}
     >
       {children}
     </aside>
   );
+}
+
+/** The Code panel's left edge: drag it or use ← → to resize, double-click for the default width. */
+function ResizeHandle({ width, min, max, onResize, onReset }: { width: number; min: number; max: number; onResize: (width: number) => void; onReset: () => void }) {
+  const drag = useRef<{ x: number; width: number } | null>(null);
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    drag.current = { x: event.clientX, width };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    if (drag.current) onResize(drag.current.width + drag.current.x - event.clientX);
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    const step = RESIZE_KEYS[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    onResize(width + step);
+  };
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize code panel"
+      aria-valuenow={width}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      tabIndex={0}
+      title="Drag to resize · double-click to reset"
+      className="group absolute inset-y-3 -left-1.5 z-10 flex w-3 cursor-col-resize touch-none justify-center outline-none"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={() => (drag.current = null)}
+      onLostPointerCapture={() => (drag.current = null)}
+      onDoubleClick={onReset}
+      onKeyDown={onKeyDown}
+    >
+      <span className="w-0.5 rounded-full transition-colors group-hover:bg-ring group-focus-visible:bg-ring group-active:bg-ring" />
+    </div>
+  );
+}
+
+/** ← widens the Code panel (its edge moves left), → narrows it. */
+const RESIZE_KEYS: Record<string, number> = { ArrowLeft: 32, ArrowRight: -32 };
+
+/** An element's width, kept current as it resizes. */
+function useWidth(ref: RefObject<HTMLElement | null>): number {
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    setWidth(element.clientWidth);
+    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
+}
+
+/** A positive number kept in localStorage, or null when never set. */
+function useStoredNumber(key: string) {
+  const [value, setValue] = useState<number | null>(() => {
+    const stored = Number(localStorage.getItem(key));
+    return stored > 0 ? stored : null;
+  });
+  useEffect(() => {
+    if (value === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, String(value));
+  }, [key, value]);
+  return [value, setValue] as const;
 }
 
 /** A collapsible part of the explanation panel. */

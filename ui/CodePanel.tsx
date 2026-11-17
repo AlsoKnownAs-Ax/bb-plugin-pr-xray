@@ -35,7 +35,8 @@ export function CodePanel({
           <Icon name="ChevronRight" />
         </Button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* Room at the bottom so the chat button never covers the last lines. */}
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-b-lg pb-16">
         {subject === null ? <p className="p-3 text-sm text-muted-foreground">Pick a step or a part of the diagram to see its code.</p> : null}
         {subject?.code.length === 0 ? <p className="p-3 text-sm text-muted-foreground">No changed lines here.</p> : null}
         {subject?.code.map(({ file, hunks }) => (
@@ -64,6 +65,7 @@ export function CodePanel({
                 onActivate={() => {}}
                 storedByGithubId={storedByGithubId}
                 onAskChat={onAskChat}
+                wrap={false}
               />
             ))}
           </section>

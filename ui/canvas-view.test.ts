@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitView, panelLayout, zoomAt, zoomBy } from "./canvas-view";
+import { clampCodeWidth, defaultCodeWidth, fitView, panelLayout, zoomAt, zoomBy } from "./canvas-view";
 
 const size = (width: number, height: number) => ({ width, height });
 const render = size(400, 200);
@@ -46,14 +46,27 @@ describe("zooming", () => {
 });
 
 describe("panels over the canvas", () => {
-  it("keeps clear of each open panel on a wide viewport", () => {
-    expect(panelLayout(false, true, true)).toEqual({ showExplain: true, reserve: { left: 344, right: 504 } });
-    expect(panelLayout(false, false, true)).toEqual({ showExplain: false, reserve: { left: 0, right: 504 } });
-    expect(panelLayout(false, true, false)).toEqual({ showExplain: true, reserve: { left: 344, right: 0 } });
+  it("keeps clear of each open panel on a wide viewport, the Code panel at its chosen width", () => {
+    expect(panelLayout(false, true, true, 640)).toEqual({ showExplain: true, reserve: { left: 344, right: 664 } });
+    expect(panelLayout(false, false, true, 480)).toEqual({ showExplain: false, reserve: { left: 0, right: 504 } });
+    expect(panelLayout(false, true, false, 640)).toEqual({ showExplain: true, reserve: { left: 344, right: 0 } });
   });
 
   it("shows one panel at a time on a compact viewport, over the drawing", () => {
-    expect(panelLayout(true, true, true)).toEqual({ showExplain: false, reserve: { left: 0, right: 0 } });
-    expect(panelLayout(true, true, false)).toEqual({ showExplain: true, reserve: { left: 0, right: 0 } });
+    expect(panelLayout(true, true, true, 640)).toEqual({ showExplain: false, reserve: { left: 0, right: 0 } });
+    expect(panelLayout(true, true, false, 640)).toEqual({ showExplain: true, reserve: { left: 0, right: 0 } });
+  });
+
+  it("keeps the Code panel between a readable minimum and a strip of canvas on its left", () => {
+    expect(clampCodeWidth(700, 1600)).toBe(700);
+    expect(clampCodeWidth(100, 1600)).toBe(360);
+    expect(clampCodeWidth(1500, 1600)).toBe(1400);
+    // A canvas narrower than both limits gets the minimum.
+    expect(clampCodeWidth(500, 400)).toBe(360);
+  });
+
+  it("starts the Code panel at about half the canvas", () => {
+    expect(defaultCodeWidth(1600)).toBe(720);
+    expect(defaultCodeWidth(600)).toBe(360);
   });
 });

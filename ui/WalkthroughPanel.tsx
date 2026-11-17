@@ -12,7 +12,7 @@ type StepProps = {
   onSelect: (index: number | null) => void;
 };
 
-/** ← / → step through and Esc goes back to All, ignoring typing and dialogs as ReviewPage's keys do. Lives outside the panel so it works collapsed. */
+/** ← / → step through and Esc goes back to All, ignoring typing and dialogs as ReviewPage's keys do, and the Code panel's resize handle. Lives outside the panel so it works collapsed. */
 export function useStepKeys({ steps, current, onSelect }: StepProps) {
   useEffect(() => {
     if (steps.length === 0) {
@@ -21,7 +21,7 @@ export function useStepKeys({ steps, current, onSelect }: StepProps) {
 
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, [contenteditable=true], [role=dialog]") || event.metaKey || event.ctrlKey || event.altKey) {
+      if (target?.closest("input, textarea, [contenteditable=true], [role=dialog], [role=separator]") || event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
 

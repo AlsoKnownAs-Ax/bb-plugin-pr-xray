@@ -65,14 +65,30 @@ export function zoomBy(view: CanvasView, factor: number): CanvasView {
   return { ...view, scale: clampScale(view.scale * factor) };
 }
 
-/** Each panel's width over the canvas, with its 12px margins. */
-const PANEL_RESERVE = { explain: 344, code: 504 };
+/** The explanation panel's width over the canvas (w-80), with its 12px margins. */
+const EXPLAIN_RESERVE = 344;
+/** Both 12px margins round a panel. */
+const PANEL_MARGINS = 24;
+/** The Code panel never gets narrower than this, so a diff stays readable. */
+const MIN_CODE_WIDTH = 360;
+/** Canvas the Code panel always leaves on its left, so the diagram can still be grabbed. */
+const CODE_FREE_LEFT = 200;
 
 /** Whether the explanation panel shows, and what fitting keeps clear of. A compact viewport has room for one panel, over the drawing. */
-export function panelLayout(compact: boolean, explainOpen: boolean, codeOpen: boolean): { showExplain: boolean; reserve: Reserve } {
+export function panelLayout(compact: boolean, explainOpen: boolean, codeOpen: boolean, codeWidth: number): { showExplain: boolean; reserve: Reserve } {
   if (compact) {
     return { showExplain: explainOpen && !codeOpen, reserve: NONE };
   }
 
-  return { showExplain: explainOpen, reserve: { left: explainOpen ? PANEL_RESERVE.explain : 0, right: codeOpen ? PANEL_RESERVE.code : 0 } };
+  return { showExplain: explainOpen, reserve: { left: explainOpen ? EXPLAIN_RESERVE : 0, right: codeOpen ? codeWidth + PANEL_MARGINS : 0 } };
+}
+
+/** A Code panel width that fits a `canvasWidth` canvas. */
+export function clampCodeWidth(width: number, canvasWidth: number): number {
+  return Math.max(MIN_CODE_WIDTH, Math.min(width, canvasWidth - CODE_FREE_LEFT));
+}
+
+/** The Code panel's first width: about half the canvas, wide enough for code beside the diagram. */
+export function defaultCodeWidth(canvasWidth: number): number {
+  return clampCodeWidth(Math.round(canvasWidth * 0.45), canvasWidth);
 }
