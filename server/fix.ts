@@ -1,6 +1,6 @@
 // Starts visible agent threads that fix review feedback on the PR branch.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import type { FixScope, PrDetails, ReviewThread, StoredComment } from "../shared/schema";
+import type { FixScope, PrDetails, ReviewThread } from "../shared/schema";
 import { stripMarker } from "./comments";
 import { findProject } from "./projects";
 import { clonePrCommit } from "./worker-clone";
@@ -88,27 +88,4 @@ export async function fixDiffComments(
     ...items,
   ].join("\n");
   return spawnFix(bb, pr, `Fix review comments: ${pr.ref.repo}#${pr.ref.number}`, prompt);
-}
-
-export async function fixDiagramComments(
-  bb: BbPluginApi,
-  pr: PrDetails,
-  comments: StoredComment[],
-  diagramTitles: Map<string, string>,
-): Promise<FixThread> {
-  const items = comments.map(
-    (comment, index) =>
-      `### ${index + 1}. On ${JSON.stringify(comment.nodeLabel)} in diagram ${JSON.stringify(diagramTitles.get(comment.diagramId ?? "") ?? comment.diagramId)}${comment.tag ? ` [${comment.tag}]` : ""}\n${quote(comment.body)}`,
-  );
-  const prompt = [
-    `The author of PR ${pr.ref.owner}/${pr.ref.repo}#${pr.ref.number} ${JSON.stringify(pr.title)} reviewed its design diagrams and believes parts of the design are wrong.`,
-    "",
-    branchInstructions(pr),
-    "",
-    "PLAN FIRST. Read the relevant code, then reply with a short redesign plan, one section per comment below (what changes, which files, risks). Then STOP and wait. For each item the author will approve, adjust or skip. Only implement the items they approve.",
-    COMMENT_GUARD,
-    "",
-    ...items,
-  ].join("\n");
-  return spawnFix(bb, pr, `Redesign from diagram feedback: ${pr.ref.repo}#${pr.ref.number}`, prompt);
 }

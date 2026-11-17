@@ -166,7 +166,6 @@ describe("diagram comments", () => {
       analysis: () => analysis,
       commentsForPr: () => pins,
       updateComment: vi.fn(),
-      insertComment: vi.fn((input: object) => input),
     };
     const bb = { realtime: { publish: vi.fn() }, agents: { registerTool: vi.fn() }, events: { on: vi.fn() } };
     const comments = createComments({ bb, store, github: {}, models: {} } as unknown as Parameters<typeof createComments>[0]);
@@ -185,15 +184,6 @@ describe("diagram comments", () => {
     });
   });
 
-  it("will not pin a comment to an analysis that is gone or has no diagrams", () => {
-    noDiagrams.forEach((analysis) => {
-      const { comments, store } = setup([], analysis);
-      const add = () => comments.addDiagramComment({ ref, analysisId: "an_2", diagramId: "data-model", nodeId: "subscription", body: "Hm." });
-      expect(add).toThrow("That diagram node no longer exists.");
-      expect(store.insertComment).not.toHaveBeenCalled();
-    });
-  });
-
   it("marks pins on nodes and tables gone after a re-run outdated, and keeps the rest open", () => {
     const { comments, store } = setup([
       pin("node-kept", "architecture-overview", "billing-service"),
@@ -208,24 +198,6 @@ describe("diagram comments", () => {
       ["table-kept", { status: "open" }],
       ["table-gone", { status: "outdated" }],
     ]);
-  });
-
-  it("pins a comment to a table with its label from the document", () => {
-    const { comments, store } = setup([]);
-    comments.addDiagramComment({ ref, analysisId: "an_2", diagramId: "data-model", nodeId: "subscription", body: "Split this." });
-    expect(store.insertComment).toHaveBeenCalledWith(
-      expect.objectContaining({ headSha: "head", diagramId: "data-model", nodeId: "subscription", nodeLabel: "Subscription" }),
-    );
-  });
-
-  it("rejects ids that are not in the document", () => {
-    const { comments, store } = setup([]);
-    const add = (diagramId: string, nodeId: string) => () =>
-      comments.addDiagramComment({ ref, analysisId: "an_2", diagramId, nodeId, body: "Hm." });
-    expect(add("data-model", "plan")).toThrow("That diagram node no longer exists.");
-    expect(add("architecture-overview", "subscription")).toThrow("That diagram node no longer exists.");
-    expect(add("nope", "billing-service")).toThrow("That diagram node no longer exists.");
-    expect(store.insertComment).not.toHaveBeenCalled();
   });
 });
 

@@ -11,16 +11,20 @@ const MAX_SCALE = 4;
 const MAX_FIT_SCALE = { whole: 1.2, focus: 1.6 };
 /** Room fitting leaves around the drawing. */
 const INSET = { side: 32, top: 48, bottom: 56 };
-/** The panel only pushes the drawing aside while at least a panel's width (w-80) stays free beside it. */
+/** Panels only push the drawing aside while at least a panel's width (w-80) stays free between them. */
 const MIN_FREE_WIDTH = 320;
 
 const clampScale = (scale: number) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale));
 
-/** The view that centres `focus` (or the whole render) in the canvas, keeping clear of a `reserveLeft` panel. */
-export function fitView(canvas: Size, render: Size, focus: Box | null, reserveLeft: number): CanvasView {
+/** Widths of the panels floating over the canvas's left and right edges. */
+export type Reserve = { left: number; right: number };
+const NONE: Reserve = { left: 0, right: 0 };
+
+/** The view that centres `focus` (or the whole render) in the canvas, keeping clear of the panels in `reserve`. */
+export function fitView(canvas: Size, render: Size, focus: Box | null, reserve: Reserve = NONE): CanvasView {
   const target = focus ?? { x: 0, y: 0, width: render.width, height: render.height };
-  const left = leftInset(canvas.width, reserveLeft);
-  const width = Math.max(1, canvas.width - left - INSET.side);
+  const { left, right } = insets(canvas.width, reserve);
+  const width = Math.max(1, canvas.width - left - right);
   const height = Math.max(1, canvas.height - INSET.top - INSET.bottom);
   const fits = Math.min(width / target.width, height / target.height);
   const scale = Math.min(maxFitScale(focus), Math.max(MIN_SCALE, fits));
@@ -31,13 +35,15 @@ export function fitView(canvas: Size, render: Size, focus: Box | null, reserveLe
   };
 }
 
-/** A narrow canvas has no room beside the panel, so the panel just overlaps the drawing. */
-function leftInset(canvasWidth: number, reserveLeft: number): number {
-  if (reserveLeft === 0 || canvasWidth - reserveLeft - INSET.side < MIN_FREE_WIDTH) {
-    return INSET.side;
+/** A canvas too narrow for the panels and a panel's width between them has the panels overlap the drawing. */
+function insets(canvasWidth: number, reserve: Reserve): Reserve {
+  const left = Math.max(INSET.side, reserve.left);
+  const right = Math.max(INSET.side, reserve.right);
+  if (canvasWidth - left - right < MIN_FREE_WIDTH) {
+    return { left: INSET.side, right: INSET.side };
   }
 
-  return reserveLeft;
+  return { left, right };
 }
 
 function maxFitScale(focus: Box | null): number {
@@ -57,4 +63,32 @@ export function zoomAt(view: CanvasView, factor: number, px: number, py: number)
 /** Zooms by `factor` about the view's origin, as the zoom buttons do. */
 export function zoomBy(view: CanvasView, factor: number): CanvasView {
   return { ...view, scale: clampScale(view.scale * factor) };
+}
+
+/** The explanation panel's width over the canvas (w-80), with its 12px margins. */
+const EXPLAIN_RESERVE = 344;
+/** Both 12px margins round a panel. */
+const PANEL_MARGINS = 24;
+/** The Code panel never gets narrower than this, so a diff stays readable. */
+const MIN_CODE_WIDTH = 360;
+/** Canvas the Code panel always leaves on its left, so the diagram can still be grabbed. */
+const CODE_FREE_LEFT = 200;
+
+/** Whether the explanation panel shows, and what fitting keeps clear of. A compact viewport has room for one panel, over the drawing. */
+export function panelLayout(compact: boolean, explainOpen: boolean, codeOpen: boolean, codeWidth: number): { showExplain: boolean; reserve: Reserve } {
+  if (compact) {
+    return { showExplain: explainOpen && !codeOpen, reserve: NONE };
+  }
+
+  return { showExplain: explainOpen, reserve: { left: explainOpen ? EXPLAIN_RESERVE : 0, right: codeOpen ? codeWidth + PANEL_MARGINS : 0 } };
+}
+
+/** A Code panel width that fits a `canvasWidth` canvas. */
+export function clampCodeWidth(width: number, canvasWidth: number): number {
+  return Math.max(MIN_CODE_WIDTH, Math.min(width, canvasWidth - CODE_FREE_LEFT));
+}
+
+/** The Code panel's first width: about half the canvas, wide enough for code beside the diagram. */
+export function defaultCodeWidth(canvasWidth: number): number {
+  return clampCodeWidth(Math.round(canvasWidth * 0.45), canvasWidth);
 }

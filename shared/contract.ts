@@ -131,38 +131,12 @@ export const rpcContract = defineRpcContract({
     input: z.object({ commentId: z.string() }),
     output: ok,
   },
-  "diagram.addComment": {
-    input: z.object({
-      ref: prRefSchema,
-      analysisId: z.string(),
-      diagramId: z.string(),
-      nodeId: z.string(),
-      body: z.string().trim().min(1).max(10000),
-    }),
-    output: storedCommentSchema,
-  },
-  "diagram.updateComment": {
-    input: z.object({
-      id: z.string(),
-      body: z.string().trim().min(1).max(10000).optional(),
-      status: z.enum(["open", "resolved"]).optional(),
-    }),
-    output: ok,
-  },
-  "diagram.deleteComment": {
-    input: z.object({ id: z.string() }),
-    output: ok,
-  },
   "fix.thread": {
     input: z.object({ ref: prRefSchema, threadId: z.string(), scope: fixScopeSchema }),
     output: threadOut,
   },
   "fix.allDiff": {
     input: z.object({ ref: prRefSchema, scope: fixScopeSchema }),
-    output: threadOut,
-  },
-  "fix.allDiagram": {
-    input: z.object({ ref: prRefSchema }),
     output: threadOut,
   },
   "chat.get": {

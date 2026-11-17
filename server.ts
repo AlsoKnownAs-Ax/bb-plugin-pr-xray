@@ -5,13 +5,12 @@ import { z } from "zod";
 import { rpcContract } from "./shared/contract";
 import { parsePrRef, prRefKey, prRefToSubPath, REVIEW_PANEL_PATH } from "./shared/pr-ref";
 import { threadsToFix } from "./shared/fix-scope";
-import { diagramTab } from "./shared/diagram-tabs";
 import type { FixScope, PrDetails, PrRef, ReviewThread } from "./shared/schema";
 import { agentTools, REVIEW_TOOL } from "./server/agent-tools";
 import { createAnalysis, findTicketUrl } from "./server/analysis";
 import { chatInstructions, createChat } from "./server/chat";
 import { createComments } from "./server/comments";
-import { fixDiagramComments, fixDiffComments } from "./server/fix";
+import { fixDiffComments } from "./server/fix";
 import { removeFilesWhenArchived } from "./server/worker-files";
 import { createGithub, GithubError } from "./server/github";
 import { createModels } from "./server/models";
@@ -236,23 +235,6 @@ export default async function plugin(bb: BbPluginApi) {
       await comments.autoTag(commentId);
       return { ok: true };
     },
-    async "diagram.addComment"({ ref, analysisId, diagramId, nodeId, body }) {
-      await comments.requireOwnPr(ref);
-      return comments.addDiagramComment({ ref, analysisId, diagramId, nodeId, body });
-    },
-    async "diagram.updateComment"({ id, body, status }) {
-      await comments.requireOwnDesignComment(id);
-      const updated = store.updateComment(id, { ...(body ? { body } : {}), ...(status ? { status } : {}) });
-      if (updated) comments.publish(updated.ref);
-      return { ok: true };
-    },
-    async "diagram.deleteComment"({ id }) {
-      await comments.requireOwnDesignComment(id);
-      const existing = store.comment(id);
-      store.deleteComment(id);
-      if (existing) comments.publish(existing.ref);
-      return { ok: true };
-    },
     async "fix.thread"({ ref, threadId, scope }) {
       const pr = await loadPr(ref, true);
       const thread = pr.threads.find((candidate) => candidate.id === threadId);
@@ -268,19 +250,6 @@ export default async function plugin(bb: BbPluginApi) {
         throw new Error(scope === "mine" ? "There are no unresolved review threads with your comments." : "There are no unresolved review threads.");
       }
       return startFix(pr, threads, scope);
-    },
-    async "fix.allDiagram"({ ref }) {
-      const pr = await loadPr(ref, true);
-      await comments.requireOwnPr(ref);
-      const open = store.commentsForPr(ref, "diagram").filter((comment) => comment.status === "open");
-      if (open.length === 0) throw new Error("There are no open design comments.");
-      const titles = new Map<string, string>();
-      for (const comment of open) {
-        const graph = store.analysis(comment.analysisId ?? "")?.result?.graph;
-        const tab = graph && diagramTab(graph, comment.diagramId);
-        if (tab) titles.set(tab.id, tab.title);
-      }
-      return fixDiagramComments(bb, pr, open, titles);
     },
     async "chat.get"({ ref }) {
       return { threadId: await chat.get(ref) };
